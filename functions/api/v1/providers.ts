@@ -8,6 +8,7 @@ const ALLOWED_HOSTS = [
   'openrouter.ai',
   'api.together.xyz',
   'api.groq.com',
+  'api.pesatrouter.com',
 ];
 
 /**
@@ -100,6 +101,22 @@ async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function providerEndpoint(baseUrl: string, endpoint: 'chat/completions' | 'images/generations'): string {
+  const url = new URL(baseUrl.trim());
+  let path = url.pathname.replace(/\/+$/, '');
+
+  // Accept either a provider base URL or an endpoint URL entered in Admin.
+  path = path.replace(/\/(?:chat\/completions|images\/generations)$/, '');
+
+  // PesatRouter requires the OpenAI-compatible API version in its path.
+  if (url.hostname === 'api.pesatrouter.com' && !path.endsWith('/v1')) {
+    path = `${path}/v1`;
+  }
+
+  url.pathname = `${path}/${endpoint}`.replace(/\/{2,}/g, '/');
+  return url.toString();
+}
+
 /**
  * Make a chat completion request to an OpenAI-compatible provider
  */
@@ -131,7 +148,7 @@ export async function chatCompletionServer(
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      const res = await fetch(`${baseUrl}/chat/completions`, {
+      const res = await fetch(providerEndpoint(baseUrl, 'chat/completions'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -203,7 +220,7 @@ export async function generateImageServer(
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-      const res = await fetch(`${baseUrl}/chat/completions`, {
+      const res = await fetch(providerEndpoint(baseUrl, 'chat/completions'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -255,7 +272,7 @@ export async function generateImageServer(
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      const res = await fetch(`${baseUrl}/images/generations`, {
+      const res = await fetch(providerEndpoint(baseUrl, 'images/generations'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

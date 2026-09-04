@@ -2,7 +2,7 @@
 // Routes: research, generate-logo, review-logo, iterate-logo
 
 import { buildResearchPrompt, buildDallePrompt, getQualityReviewPrompt, getIterationPrompt } from '../../lib/prompts';
-import { ValidationError, ProviderError, successResponse, errorResponse } from '../../lib/errors';
+import { AppError, ValidationError, ProviderError, successResponse, errorResponse } from '../../lib/errors';
 import {
   validateResearchRequest,
   validateGenerateRequest,
@@ -65,8 +65,8 @@ async function getActiveProvider(db: D1Database, env: Env): Promise<{
   if (env.OPENAI_API_KEY) {
     return {
       apiKey: env.OPENAI_API_KEY,
-      baseUrl: 'https://api.openai.com/v1',
-      textModel: 'gpt-4o',
+      baseUrl: 'https://api.pesatrouter.com/v1',
+      textModel: 'pesat-flash',
       imageModel: 'dall-e-3',
     };
   }
@@ -97,9 +97,42 @@ async function handleResearch(
   return parseJsonResponse(content);
 }
 
+function sanitizeGeneratedSvg(raw: string): string {
+  const match = raw.match(/<svg[\s\S]*?<\/svg>/i);
+  if (!match) {
+    throw new Error('PesatRouter did not return a valid SVG wordmark');
+  }
+
+  return match[0]
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<foreignObject[\s\S]*?<\/foreignObject>/gi, '')
+    .replace(/\son\w+\s*=\s*(["']).*?\1/gi, '')
+    .replace(/\s(?:href|xlink:href)\s*=\s*(["'])(?:https?:|javascript:).*?\1/gi, '');
+}
+
+async function generateSvgWordmark(
+  prompt: string,
+  brandName: string,
+  provider: { apiKey: string; baseUrl: string; textModel: string },
+): Promise<{ url: string; revisedPrompt: string }> {
+  const content = await chatCompletionServer(
+    'You are an expert identity designer and SVG artist. Return one complete, valid, self-contained SVG only. Do not use markdown, scripts, external URLs, external fonts, or foreignObject. Use a 1200x1200 viewBox, vector shapes, text, and system font fallbacks.',
+    `Create a polished typography-first wordmark logo for "${brandName}". ${prompt}`,
+    provider.apiKey,
+    provider.baseUrl,
+    provider.textModel,
+    { temperature: 0.8, responseFormat: false, timeoutMs: 60_000 },
+  );
+  const svg = sanitizeGeneratedSvg(content);
+  return {
+    url: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,
+    revisedPrompt: prompt,
+  };
+}
+
 async function handleGenerate(
   body: GenerateRequest,
-  provider: { apiKey: string; baseUrl: string; imageModel: string },
+  provider: { apiKey: string; baseUrl: string; textModel: string; imageModel: string },
   db: D1Database,
   generatedBucket: R2Bucket | undefined,
   requestId: string,
@@ -126,13 +159,17 @@ async function handleGenerate(
       referenceImages: body.referenceImages || [],
     } as import('../../lib/types').WizardData);
 
-    const result = await generateImageServer(
-      prompt,
-      provider.apiKey,
-      provider.baseUrl,
-      provider.imageModel,
-      { timeoutMs: 60_000 },
-    );
+    const providerHost = new URL(provider.baseUrl).hostname;
+    const useSvgGeneration = providerHost === 'api.pesatrouter.com' || !provider.imageModel;
+    const result = useSvgGeneration
+      ? await generateSvgWordmark(prompt, body.brandName, provider)
+      : await generateImageServer(
+          prompt,
+          provider.apiKey,
+          provider.baseUrl,
+          provider.imageModel,
+          { timeoutMs: 60_000 },
+        );
 
     const duration = Date.now() - startTime;
 
@@ -301,6 +338,16 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     return successResponse(data, requestId);
   } catch (err) {
-    return errorResponse(err, requestId);
+    if (err instanceof AppError) {
+      return errorResponse(err, requestId);
+    }
+
+    const providerMessage = err instanceof Error
+      ? err.message
+      : 'Unknown provider error';
+    return errorResponse(
+      new ProviderError(`PesatRouter request failed: ${providerMessage}`),
+      requestId
+    );
   }
 };

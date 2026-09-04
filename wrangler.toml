@@ -1,4 +1,4 @@
-name = "wordmarks"
+name = "wordmarks-v2"
 compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "out"
@@ -7,21 +7,15 @@ pages_build_output_dir = "out"
 [[d1_databases]]
 binding = "DB"
 database_name = "wordmarks-db"
-database_id = "9c354852-9b71-4f13-abaf-c9a1a0bbd6e4"
+database_id = "0b243319-821b-42a0-b0d0-36d27dac4a61"
 
 # ─── KV Namespace (rate limiting + caching) ─────────────
 [[kv_namespaces]]
 binding = "WORDMARKS_KV"
-id = "625572dce3d948ea8ebf927de238e718"
+id = "bbffa8e810ee4ec1a25f61de6fd840ec"
 
 # ─── R2 Object Storage ───────────────────────────────────
-[[r2_buckets]]
-binding = "KB_BUCKET"
-bucket_name = "wordmarks-kb"
-
-[[r2_buckets]]
-binding = "GENERATED_BUCKET"
-bucket_name = "wordmarks-generated"
+# R2 bindings are intentionally omitted for the free deployment without R2.
 
 # ─── Environment Variables ──────────────────────────────
 # Set these via wrangler pages secret put:

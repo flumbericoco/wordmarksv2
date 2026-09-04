@@ -30,7 +30,12 @@ export default function KnowledgeBasePage() {
     }
   };
 
-  useEffect(() => { loadItems(); }, []);
+  useEffect(() => {
+    listKBItems()
+      .then(setItems)
+      .catch((reason) => setError(reason instanceof Error ? reason.message : 'Failed to load items'))
+      .finally(() => setLoading(false));
+  }, []);
 
   const handleFiles = async (files: FileList | null) => {
     if (!files) return;
@@ -89,7 +94,7 @@ export default function KnowledgeBasePage() {
   const filtered = filterCategory === 'all' ? items : items.filter((i) => i.category === filterCategory);
 
   return (
-    <div className="space-y-6">
+    <div className="admin-page admin-enter space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Knowledge Base</h1>

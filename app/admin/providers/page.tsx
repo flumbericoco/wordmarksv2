@@ -10,6 +10,7 @@ import {
 } from '@/lib/admin-api';
 
 const PRESETS: Partial<AdminProvider>[] = [
+  { name: 'PesatRouter', baseUrl: 'https://api.pesatrouter.com/v1', textModel: 'pesat-flash', imageModel: '' },
   { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', textModel: 'gpt-4o', imageModel: 'dall-e-3' },
   { name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', textModel: 'openai/gpt-4o', imageModel: 'openai/dall-e-3' },
   { name: 'Together AI', baseUrl: 'https://api.together.xyz/v1', textModel: 'meta-llama/Llama-3-70b-chat-hf', imageModel: 'stabilityai/stable-diffusion-xl' },
@@ -36,7 +37,12 @@ export default function ProvidersPage() {
     }
   };
 
-  useEffect(() => { loadProviders(); }, []);
+  useEffect(() => {
+    listProviders()
+      .then(setProviders)
+      .catch((reason) => setError(reason instanceof Error ? reason.message : 'Failed to load providers'))
+      .finally(() => setLoading(false));
+  }, []);
 
   const handleAdd = (preset?: Partial<AdminProvider>) => {
     const newProvider: Partial<AdminProvider & { apiKey?: string }> = {
@@ -103,7 +109,7 @@ export default function ProvidersPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="admin-page admin-enter space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">API Providers</h1>

@@ -1,8 +1,8 @@
 // ─── Admin API Client ───────────────────────────────────
 // Server-side API calls for admin operations
-// Uses dedicated api.wordmarks.net to avoid wordmarks.net routing issues
+// Uses this deployment's Cloudflare Pages Functions.
 
-const ADMIN_API_BASE = 'https://api.wordmarks.net/api/v1/admin';
+const ADMIN_API_BASE = '/api/v1/admin';
 
 interface AdminApiResponse<T> {
   ok: boolean;

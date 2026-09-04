@@ -2,11 +2,10 @@ import { WizardData, LogoResult, QualityScore, AiRecommendations } from './types
 import { buildResearchPrompt, buildDallePrompt, getQualityReviewPrompt, getIterationPrompt } from './prompts';
 
 // ─── Server API Client ──────────────────────────────────
-// All API calls go through api.wordmarks.net/api/v1/* (Cloudflare Pages Functions)
+// All API calls go through this deployment's Cloudflare Pages Functions.
 // API keys are NEVER exposed to the browser
-// Dedicated API hostname avoids wordmarks.net GET routing bug
 
-const API_BASE = 'https://api.wordmarks.net/api/v1';
+const API_BASE = '/api/v1';
 
 interface ApiResponse<T> {
   ok: boolean;

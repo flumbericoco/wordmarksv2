@@ -118,27 +118,23 @@ export default function WizardContainer({ onComplete }: WizardContainerProps) {
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-4xl">
       {/* Progress */}
-      <div className="mb-8">
-        <div className="flex items-center gap-1">
+      <div className="mb-8 flex items-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.035] p-2">
           {['Input', 'Research', 'Generate'].map((label, idx) => {
             const isActive = (step === 'input' && idx === 0) || (step === 'research' && idx === 1);
             const isDone = (step === 'research' && idx === 0) || step === 'generating' || step === 'result';
             return (
-              <div key={label} className="flex items-center gap-1 flex-1">
-                <div className={`h-1.5 flex-1 rounded-full transition-colors ${
-                  isDone ? 'bg-green-500' : isActive ? 'bg-blue-500' : 'bg-white/10'
-                }`} />
+              <div key={label} className={`flex flex-1 items-center gap-2 rounded-xl px-3 py-2.5 transition-all ${
+                isActive ? 'bg-white/[0.09] text-white' : isDone ? 'text-[#c6ff4a]' : 'text-white/25'
+              }`}>
+                <span className={`grid h-6 w-6 place-items-center rounded-full text-[10px] font-black ${
+                  isDone ? 'bg-[#c6ff4a] text-black' : isActive ? 'bg-[#ff7655] text-white' : 'border border-white/15'
+                }`}>{isDone ? '✓' : idx + 1}</span>
+                <span className="hidden text-[10px] font-bold uppercase tracking-[0.14em] sm:inline">{label}</span>
               </div>
             );
           })}
-        </div>
-        <div className="mt-2 flex justify-between text-[10px]">
-          <span className="text-green-400">Input</span>
-          <span className={step === 'research' ? 'text-blue-400' : recommendations ? 'text-green-400' : 'text-zinc-600'}>Research</span>
-          <span className="text-zinc-600">Generate</span>
-        </div>
       </div>
 
       {/* Steps */}

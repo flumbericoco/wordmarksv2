@@ -18,7 +18,7 @@ const RATE_LIMITS: Record<string, RateLimitConfig> = {
   'unauthenticated': { windowMs: 60_000, maxRequests: 5 },
   'authenticated': { windowMs: 60_000, maxRequests: 30 },
   'generation': { windowMs: 3_600_000, maxRequests: 10 }, // 10 per hour
-  'admin': { windowMs: 60_000, maxRequests: 60 },
+  'admin': { windowMs: 60_000, maxRequests: 300 },
 };
 
 // ─── In-Memory Fallback (per-isolate, resets on cold start) ──
