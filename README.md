@@ -61,6 +61,36 @@ Local `.env.local` contains only reference config (model names, defaults) -- no 
 
 Canonical API hostname: `https://api.wordmarks.net`
 
+## MCP for Claude Code and AI Agents
+
+The production MCP endpoint is:
+
+```text
+https://wordmarks-v2-dz1.pages.dev/mcp
+```
+
+Set a dedicated token once in Cloudflare (do not commit the value):
+
+```bash
+npx wrangler pages secret put WORDMARKS_MCP_TOKEN --project-name=wordmarks-v2
+```
+
+Connect Claude Code:
+
+```bash
+claude mcp add --transport http wordmarks https://wordmarks-v2-dz1.pages.dev/mcp \
+  --header "Authorization: Bearer YOUR_WORDMARKS_MCP_TOKEN"
+```
+
+The server exposes `generate_wordmark_logo`. Example agent instruction:
+
+```text
+Use generate_wordmark_logo to create a bold horizontal blue wordmark for Acme,
+a payment platform for small businesses.
+```
+
+Any MCP client that supports Streamable HTTP can use the same endpoint and Bearer header.
+
 ### Health Check
 
 ```bash
