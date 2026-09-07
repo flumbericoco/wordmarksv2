@@ -21,6 +21,13 @@ const steps = [
   ['03', 'Refine until it clicks', 'Review, iterate, and download a mark that feels unmistakably yours.'],
 ];
 
+const pricingPlans = [
+  { name: 'Lite', monthly: '$1', monthlyCredits: '1', effective: '$1.00', featured: false },
+  { name: 'Growth', monthly: '$3', monthlyCredits: '4', effective: '$0.75', featured: true },
+  { name: 'Pro', monthly: '$7', monthlyCredits: '10', effective: '$0.70', featured: false },
+  { name: 'Scale', monthly: '$17', monthlyCredits: '28', effective: '$0.61', featured: false },
+];
+
 export default function Home() {
   const [view, setView] = useState<'wizard' | 'result'>('wizard');
   const [wizardData, setWizardData] = useState<WizardData | null>(null);
@@ -161,6 +168,7 @@ export default function Home() {
           <nav className="flex items-center gap-3 sm:gap-7" aria-label="Main navigation">
             <a href="#process" className="hidden text-xs font-semibold uppercase tracking-[0.16em] transition-opacity hover:opacity-50 sm:block">Process</a>
             <a href="#developers" className="hidden text-xs font-semibold uppercase tracking-[0.16em] transition-opacity hover:opacity-50 md:block">Developers</a>
+            <a href="#pricing" className="hidden text-xs font-semibold uppercase tracking-[0.16em] transition-opacity hover:opacity-50 lg:block">Pricing</a>
             <a href="/admin" className="hidden text-xs font-semibold uppercase tracking-[0.16em] transition-opacity hover:opacity-50 sm:block">Admin</a>
             <a href="#create" className="rounded-full bg-[#171714] px-5 py-2.5 text-xs font-bold uppercase tracking-[0.12em] text-white transition-transform hover:-translate-y-0.5">Create yours</a>
           </nav>
@@ -337,6 +345,66 @@ export default function Home() {
                 <blockquote className="max-w-4xl text-4xl font-black leading-[1.02] tracking-[-0.055em] sm:text-6xl">
                   Your next big idea deserves a name people remember—and a mark they recognize anywhere.
                 </blockquote>
+              </div>
+            </section>
+
+            <section id="pricing" data-reveal className="reveal-section bg-[#f2f0e9] px-5 py-16 sm:px-8 lg:py-24">
+              <div className="mx-auto max-w-7xl">
+                <div className="grid gap-6 border-b border-black/15 pb-10 lg:grid-cols-[1fr_0.8fr] lg:items-end">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#5b42d5]">Simple pricing</p>
+                    <h2 className="mt-4 max-w-3xl text-5xl font-black leading-[0.9] tracking-[-0.065em] sm:text-7xl">
+                      Start with 25 logos for $25.
+                    </h2>
+                  </div>
+                  <p className="max-w-xl text-base leading-7 text-black/55 lg:justify-self-end">
+                    Top up anytime. Credits never expire. Keep your account active from only $1 a month and receive fresh credits every month.
+                  </p>
+                </div>
+
+                <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  {pricingPlans.map((plan) => (
+                    <article
+                      key={plan.name}
+                      className={`relative flex min-h-80 flex-col rounded-[1.75rem] border p-6 transition-transform hover:-translate-y-1 ${
+                        plan.featured
+                          ? 'border-[#171714] bg-[#171714] text-white shadow-[0_20px_50px_rgba(23,23,20,0.18)]'
+                          : 'border-black/15 bg-white/55 text-[#171714]'
+                      }`}
+                    >
+                      {plan.featured ? (
+                        <span className="absolute right-5 top-5 rounded-full bg-[#c6ff4a] px-3 py-1 text-[9px] font-black uppercase tracking-[0.15em] text-black">Most popular</span>
+                      ) : null}
+                      <p className={`text-xs font-black uppercase tracking-[0.18em] ${plan.featured ? 'text-white/45' : 'text-black/40'}`}>{plan.name}</p>
+                      <div className="mt-7 flex items-end gap-2">
+                        <span className="text-5xl font-black tracking-[-0.07em]">{plan.monthly}</span>
+                        <span className={`pb-1 text-xs ${plan.featured ? 'text-white/45' : 'text-black/45'}`}>/month</span>
+                      </div>
+                      <p className={`mt-3 text-sm ${plan.featured ? 'text-white/55' : 'text-black/55'}`}>$25 today includes 25 logo credits.</p>
+                      <div className={`my-6 h-px ${plan.featured ? 'bg-white/15' : 'bg-black/10'}`} />
+                      <ul className={`space-y-3 text-sm ${plan.featured ? 'text-white/70' : 'text-black/65'}`}>
+                        <li>{plan.monthlyCredits} new {plan.monthlyCredits === '1' ? 'credit' : 'credits'} every month</li>
+                        <li>From {plan.effective} per logo</li>
+                        <li>Credits never expire</li>
+                        <li>Top up and cancel anytime</li>
+                      </ul>
+                      <a
+                        href="#create"
+                        className={`mt-auto rounded-full px-5 py-3 text-center text-xs font-black uppercase tracking-[0.13em] transition-transform hover:-translate-y-0.5 ${
+                          plan.featured ? 'bg-[#c6ff4a] text-black' : 'bg-[#171714] text-white'
+                        }`}
+                      >
+                        Create your first logo
+                      </a>
+                    </article>
+                  ))}
+                </div>
+
+                <div className="mt-7 grid gap-3 rounded-2xl border border-black/10 bg-white/40 p-5 text-sm text-black/60 sm:grid-cols-3">
+                  <p><strong className="text-black">One credit, one logo.</strong><br />No confusing token math.</p>
+                  <p><strong className="text-black">Use them anytime.</strong><br />Unused credits roll over forever.</p>
+                  <p><strong className="text-black">No lock-in.</strong><br />Change plans or cancel whenever you want.</p>
+                </div>
               </div>
             </section>
           </>
