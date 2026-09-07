@@ -160,6 +160,7 @@ export default function Home() {
           </a>
           <nav className="flex items-center gap-3 sm:gap-7" aria-label="Main navigation">
             <a href="#process" className="hidden text-xs font-semibold uppercase tracking-[0.16em] transition-opacity hover:opacity-50 sm:block">Process</a>
+            <a href="#developers" className="hidden text-xs font-semibold uppercase tracking-[0.16em] transition-opacity hover:opacity-50 md:block">Developers</a>
             <a href="/admin" className="hidden text-xs font-semibold uppercase tracking-[0.16em] transition-opacity hover:opacity-50 sm:block">Admin</a>
             <a href="#create" className="rounded-full bg-[#171714] px-5 py-2.5 text-xs font-bold uppercase tracking-[0.12em] text-white transition-transform hover:-translate-y-0.5">Create yours</a>
           </nav>
@@ -262,6 +263,60 @@ export default function Home() {
                     <h3 className="mt-20 text-2xl font-bold tracking-[-0.04em]">Built to adapt</h3>
                     <p className="mt-3 text-sm leading-6 text-white/45">A clean mark that stays confident across websites, products, and social profiles.</p>
                   </article>
+                </div>
+              </div>
+            </section>
+
+            <section id="developers" data-reveal className="reveal-section overflow-hidden bg-[#c6ff4a] px-5 py-16 sm:px-8 lg:py-24">
+              <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.82fr_1.18fr] lg:items-center">
+                <div>
+                  <div className="inline-flex items-center gap-2 rounded-full border border-black/20 bg-white/35 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em]">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#171714]" />
+                    MCP + REST API
+                  </div>
+                  <h2 className="mt-5 max-w-xl text-5xl font-black leading-[0.88] tracking-[-0.07em] sm:text-7xl">
+                    Logos from your AI agent.
+                  </h2>
+                  <p className="mt-6 max-w-xl text-base leading-7 text-black/60">
+                    Connect Wordmarks once, then create production-ready SVG logos from Codex, Kilo, Zcode, Claude Code, or any MCP-compatible CLI using natural language.
+                  </p>
+                  <div className="mt-7 flex flex-wrap gap-2" aria-label="Compatible AI agents">
+                    {['Codex', 'Kilo', 'Zcode', 'Claude Code', 'Any MCP client'].map((agent) => (
+                      <span key={agent} className="rounded-full border border-black/15 bg-white/45 px-3 py-1.5 text-xs font-bold">{agent}</span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-[2rem] bg-[#171714] p-5 text-white shadow-[0_24px_70px_rgba(30,40,10,0.2)] sm:p-8">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-5">
+                    <div className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full bg-[#ff5c35]" />
+                      <span className="h-2.5 w-2.5 rounded-full bg-[#f2cf5b]" />
+                      <span className="h-2.5 w-2.5 rounded-full bg-[#c6ff4a]" />
+                    </div>
+                    <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-white/35">Agent-ready</span>
+                  </div>
+                  <div className="py-6 font-mono text-xs leading-7 sm:text-sm">
+                    <p className="text-white/35"># Remote MCP endpoint</p>
+                    <p className="break-all text-[#c6ff4a]">https://wordmarks-v2-dz1.pages.dev/mcp</p>
+                    <p className="mt-4 text-white/35"># Available tool</p>
+                    <p className="text-white">generate_wordmark_logo</p>
+                    <p className="mt-4 text-white/35"># Then just ask your agent</p>
+                    <p className="text-white">&quot;Create a bold blue wordmark for Orbit Labs and save it as SVG.&quot;</p>
+                  </div>
+                  <div className="grid gap-3 border-t border-white/10 pt-5 sm:grid-cols-3">
+                    {[
+                      ['01', 'Add endpoint'],
+                      ['02', 'Authenticate'],
+                      ['03', 'Describe your logo'],
+                    ].map(([number, label]) => (
+                      <div key={number} className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+                        <p className="font-mono text-[10px] text-[#c6ff4a]">{number}</p>
+                        <p className="mt-1 text-xs font-bold">{label}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-5 text-xs leading-5 text-white/40">Bearer token required. Credentials stay server-side; PesatRouter keys are never exposed to agents.</p>
                 </div>
               </div>
             </section>
