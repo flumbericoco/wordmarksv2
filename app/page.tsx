@@ -390,12 +390,12 @@ export default function Home() {
                         <li>Top up and cancel anytime</li>
                       </ul>
                       <a
-                        href="#create"
+                        href={`/account?plan=${plan.name.toLowerCase()}`}
                         className={`mt-auto rounded-full px-5 py-3 text-center text-xs font-black uppercase tracking-[0.13em] transition-transform hover:-translate-y-0.5 ${
                           plan.featured ? 'bg-[#c6ff4a] text-black' : 'bg-[#171714] text-white'
                         }`}
                       >
-                        Create your first logo
+                        Choose {plan.name}
                       </a>
                     </article>
                   ))}

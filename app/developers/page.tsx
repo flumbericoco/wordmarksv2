@@ -27,8 +27,8 @@ export default function DevelopersPage() {
           <Link href="/" className="text-xl font-black tracking-[-0.06em]">
             wordmarks<span className="text-[#ff5c35]">.</span>
           </Link>
-          <Link href="/#create" className="rounded-full bg-[#171714] px-5 py-2.5 text-xs font-bold uppercase tracking-[0.12em] text-white">
-            Create a logo
+          <Link href="/account" className="rounded-full bg-[#171714] px-5 py-2.5 text-xs font-bold uppercase tracking-[0.12em] text-white">
+            Get API access
           </Link>
         </div>
       </header>
@@ -45,7 +45,7 @@ export default function DevelopersPage() {
 
           <div className="mt-12 grid gap-5 lg:grid-cols-3">
             {[
-              ['01', 'Get access', 'Request a Wordmarks token from the administrator. Never use the PesatRouter key here.'],
+              ['01', 'Create your API key', 'Open your Wordmarks account, create a personal API key, and copy it once. Never use the PesatRouter key here.'],
               ['02', 'Connect MCP', 'Use Streamable HTTP directly, or mcp-remote when your agent only supports local stdio.'],
               ['03', 'Describe the logo', 'Ask naturally. The agent calls generate_wordmark_logo and receives an editable SVG.'],
             ].map(([number, title, copy]) => (

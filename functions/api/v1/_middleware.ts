@@ -101,6 +101,15 @@ export const onRequest = async (context: MiddlewareContext): Promise<Response> =
   try {
     response = await next();
   } catch (err) {
+    console.error(JSON.stringify({
+      level: 'error',
+      event: 'unhandled_api_error',
+      requestId,
+      method: request.method,
+      path: new URL(request.url).pathname,
+      message: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
+    }));
     response = errorResponse(err, requestId);
   }
 

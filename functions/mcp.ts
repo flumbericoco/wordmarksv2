@@ -1,6 +1,8 @@
 import { authenticateRequest } from './api/v1/auth';
+import { getApiKeyUser } from './api/v1/user-auth';
 
 interface Env {
+  DB: D1Database;
   WORDMARKS_MCP_TOKEN?: string;
 }
 
@@ -71,8 +73,9 @@ export const onRequestGet: PagesFunction<Env> = async () => Response.json({
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const auth = authenticateRequest(request, env);
-  if (!auth.authenticated) {
-    return jsonRpcError(null, -32001, 'Unauthorized. Use Authorization: Bearer <WORDMARKS_MCP_TOKEN>.', 401);
+  const apiUser = auth.authenticated ? null : await getApiKeyUser(request, env.DB);
+  if (!auth.authenticated && !apiUser) {
+    return jsonRpcError(null, -32001, 'Unauthorized. Use a Wordmarks API key.', 401);
   }
 
   let rpc: JsonRpcRequest;
@@ -105,21 +108,41 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       return jsonRpcError(rpc.id, -32602, 'Tool arguments must be an object');
     }
 
-    const apiUrl = new URL('/api/v1/generate-logo', request.url);
-    const apiResponse = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: request.headers.get('Authorization') || '',
-      },
-      body: JSON.stringify(args),
-    });
-    const payload = await apiResponse.json<Record<string, unknown>>();
-    if (!apiResponse.ok || payload.ok !== true) {
+    if (apiUser) {
+      const reserved = await env.DB.prepare(
+        "UPDATE users SET credits = credits - 1, updated_at = datetime('now') WHERE id = ? AND credits > 0"
+      ).bind(apiUser.id).run();
+      if (!reserved.meta.changes) {
+        return jsonRpc(rpc.id, {
+          content: [{ type: 'text', text: 'Insufficient credits. Top up your Wordmarks account.' }],
+          isError: true,
+        });
+      }
+    }
+
+    let payload: Record<string, unknown>;
+    try {
+      const apiUrl = new URL('/api/v1/generate-logo', request.url);
+      const apiResponse = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(args),
+      });
+      payload = await apiResponse.json<Record<string, unknown>>();
+      if (!apiResponse.ok || payload.ok !== true) throw new Error(String(payload.error || 'Logo generation failed'));
+    } catch (error) {
+      if (apiUser) {
+        await env.DB.prepare("UPDATE users SET credits = credits + 1, updated_at = datetime('now') WHERE id = ?").bind(apiUser.id).run();
+      }
       return jsonRpc(rpc.id, {
-        content: [{ type: 'text', text: String(payload.error || 'Logo generation failed') }],
+        content: [{ type: 'text', text: error instanceof Error ? error.message : 'Logo generation failed' }],
         isError: true,
       });
+    }
+
+    if (apiUser) {
+      await env.DB.prepare('INSERT INTO credit_ledger (id, user_id, amount, reason, reference) VALUES (?, ?, -1, ?, ?)')
+        .bind(crypto.randomUUID(), apiUser.id, 'logo_generation', crypto.randomUUID()).run();
     }
 
     const data = payload.data as Record<string, unknown>;

@@ -21,6 +21,10 @@ id = "bbffa8e810ee4ec1a25f61de6fd840ec"
 # Set these via wrangler pages secret put:
 #   OPENAI_API_KEY       - OpenAI API key (NEVER commit to repo)
 #   WORDMARKS_MCP_TOKEN  - Auth token for MCP agents
+#   STRIPE_SECRET_KEY    - Stripe server API key
+#   STRIPE_WEBHOOK_SECRET - Stripe webhook signing secret
+#   STRIPE_PRICE_INITIAL_25 - One-time $25 / 25-credit Price ID
+#   STRIPE_PRICE_LITE, STRIPE_PRICE_GROWTH, STRIPE_PRICE_PRO, STRIPE_PRICE_SCALE
 #
 # DO NOT add secrets here. Use:
 #   wrangler pages secret put OPENAI_API_KEY --project-name=wordmarks-v2

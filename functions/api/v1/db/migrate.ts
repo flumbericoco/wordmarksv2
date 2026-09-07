@@ -88,6 +88,37 @@ CREATE INDEX IF NOT EXISTS idx_usage_counters_token ON usage_counters(token, act
 CREATE INDEX IF NOT EXISTS idx_audit_events_type ON audit_events(event_type);
 CREATE INDEX IF NOT EXISTS idx_audit_events_created ON audit_events(created_at);
 CREATE INDEX IF NOT EXISTS idx_knowledge_items_category ON knowledge_items(category);
+
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL,
+  password_salt TEXT NOT NULL, plan TEXT NOT NULL DEFAULT 'none',
+  credits INTEGER NOT NULL DEFAULT 0 CHECK (credits >= 0), stripe_customer_id TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS user_sessions (
+  id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL UNIQUE, expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS api_keys (
+  id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL, key_prefix TEXT NOT NULL, key_hash TEXT NOT NULL UNIQUE,
+  last_used_at TEXT, revoked_at TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS credit_ledger (
+  id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  amount INTEGER NOT NULL, reason TEXT NOT NULL, reference TEXT UNIQUE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS subscriptions (
+  id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  stripe_subscription_id TEXT UNIQUE, plan TEXT NOT NULL, status TEXT NOT NULL,
+  current_period_end TEXT, updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_token ON user_sessions(token_hash);
+CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
+CREATE INDEX IF NOT EXISTS idx_api_keys_user ON api_keys(user_id);
+CREATE INDEX IF NOT EXISTS idx_credit_ledger_user ON credit_ledger(user_id, created_at);
 `;
 
 export const onRequest: PagesFunction<Env> = async (context) => {
