@@ -167,7 +167,7 @@ export default function Home() {
           </a>
           <nav className="flex items-center gap-3 sm:gap-7" aria-label="Main navigation">
             <a href="#process" className="hidden text-xs font-semibold uppercase tracking-[0.16em] transition-opacity hover:opacity-50 sm:block">Process</a>
-            <a href="#developers" className="hidden text-xs font-semibold uppercase tracking-[0.16em] transition-opacity hover:opacity-50 md:block">Developers</a>
+            <a href="/developers" className="hidden text-xs font-semibold uppercase tracking-[0.16em] transition-opacity hover:opacity-50 md:block">Developers</a>
             <a href="#pricing" className="hidden text-xs font-semibold uppercase tracking-[0.16em] transition-opacity hover:opacity-50 lg:block">Pricing</a>
             <a href="/admin" className="hidden text-xs font-semibold uppercase tracking-[0.16em] transition-opacity hover:opacity-50 sm:block">Admin</a>
             <a href="#create" className="rounded-full bg-[#171714] px-5 py-2.5 text-xs font-bold uppercase tracking-[0.12em] text-white transition-transform hover:-translate-y-0.5">Create yours</a>
@@ -325,6 +325,7 @@ export default function Home() {
                     ))}
                   </div>
                   <p className="mt-5 text-xs leading-5 text-white/40">Bearer token required. Credentials stay server-side; PesatRouter keys are never exposed to agents.</p>
+                  <a href="/developers" className="mt-5 inline-flex text-xs font-black uppercase tracking-[0.13em] text-[#c6ff4a] transition-opacity hover:opacity-65">Read developer docs →</a>
                 </div>
               </div>
             </section>
