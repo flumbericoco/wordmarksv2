@@ -82,6 +82,16 @@ export default function AccountPage() {
     finally { setBusy(false); }
   }
 
+  async function requestReset() {
+    if (!email) return setMessage('Enter your email first.');
+    setBusy(true); setMessage('');
+    try {
+      const result = await api<{ message: string }>('account/request-reset', { method: 'POST', body: JSON.stringify({ email }) });
+      setMessage(result.message || 'Check your inbox for a reset link.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Unable to request reset'); }
+    finally { setBusy(false); }
+  }
+
   async function createKey() {
     setBusy(true); setMessage('');
     try {
@@ -133,6 +143,7 @@ export default function AccountPage() {
             <button disabled={busy} className="w-full rounded-full bg-[#171714] px-5 py-3.5 text-sm font-black text-white disabled:opacity-50">{busy ? 'Please wait...' : mode === 'register' ? 'Create account' : 'Sign in'}</button>
           </form>
           <button onClick={() => setMode(mode === 'register' ? 'login' : 'register')} className="mt-5 w-full text-sm text-black/55 underline underline-offset-4">{mode === 'register' ? 'Already registered? Sign in' : 'Need an account? Register'}</button>
+          {mode === 'login' ? <button type="button" onClick={requestReset} disabled={busy} className="mt-3 w-full text-sm text-black/55 underline underline-offset-4">Forgot password?</button> : null}
         </div>
       </main>
     );

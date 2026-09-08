@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import StepNavigation from './StepNavigation';
 
 interface StepInputProps {
@@ -13,6 +13,18 @@ export default function StepInput({ brandName, description, onNext }: StepInputP
   const [name, setName] = useState(brandName);
   const [desc, setDesc] = useState(description);
   const cleanName = name.trim();
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('wordmarks:draft') || '{}') as { name?: string; description?: string };
+      if (!brandName && saved.name) setName(saved.name);
+      if (!description && saved.description) setDesc(saved.description);
+    } catch { /* Ignore malformed browser storage. */ }
+  }, [brandName, description]);
+
+  useEffect(() => {
+    localStorage.setItem('wordmarks:draft', JSON.stringify({ name, description: desc }));
+  }, [name, desc]);
 
   return (
     <div className="wizard-enter">

@@ -105,6 +105,12 @@ CREATE TABLE IF NOT EXISTS user_sessions (
   token_hash TEXT NOT NULL UNIQUE, expires_at TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS auth_tokens (
+  id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL UNIQUE,
+  purpose TEXT NOT NULL CHECK (purpose IN ('password_reset', 'email_verification')),
+  expires_at TEXT NOT NULL, used_at TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 CREATE TABLE IF NOT EXISTS api_keys (
   id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   name TEXT NOT NULL, key_prefix TEXT NOT NULL, key_hash TEXT NOT NULL UNIQUE,
@@ -125,12 +131,22 @@ CREATE TABLE IF NOT EXISTS payment_events (
   status TEXT NOT NULL CHECK (status IN ('processing', 'processed', 'failed')),
   error TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), processed_at TEXT
 );
+CREATE TABLE IF NOT EXISTS payment_transactions (
+  id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  stripe_checkout_id TEXT UNIQUE, stripe_payment_intent_id TEXT, stripe_invoice_id TEXT,
+  kind TEXT NOT NULL, amount INTEGER NOT NULL DEFAULT 0, currency TEXT NOT NULL DEFAULT 'usd',
+  credits INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 CREATE INDEX IF NOT EXISTS idx_sessions_token ON user_sessions(token_hash);
+CREATE INDEX IF NOT EXISTS idx_auth_tokens_lookup ON auth_tokens(token_hash, purpose, expires_at);
 CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
 CREATE INDEX IF NOT EXISTS idx_api_keys_user ON api_keys(user_id);
 CREATE INDEX IF NOT EXISTS idx_credit_ledger_user ON credit_ledger(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(user_id, status);
 CREATE INDEX IF NOT EXISTS idx_payment_events_status ON payment_events(status, created_at);
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_user ON payment_transactions(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_intent ON payment_transactions(stripe_payment_intent_id);
 `;
 
 export const onRequest: PagesFunction<Env> = async (context) => {

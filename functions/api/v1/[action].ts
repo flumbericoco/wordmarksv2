@@ -55,9 +55,10 @@ async function getActiveProvider(db: D1Database, env: Env): Promise<{
 } | null> {
   // Try D1 first
   try {
-    const row = await db.prepare(
-      'SELECT * FROM providers WHERE is_active = 1 LIMIT 1'
-    ).first();
+    const configured = await db.prepare("SELECT value FROM settings WHERE key='defaultProviderId'").first<{ value: string }>();
+    const row = configured?.value
+      ? await db.prepare('SELECT * FROM providers WHERE id = ? LIMIT 1').bind(configured.value).first()
+      : await db.prepare('SELECT * FROM providers WHERE is_active = 1 LIMIT 1').first();
     if (row) {
       return {
         apiKey: env.OPENAI_API_KEY || '', // Key comes from secret, not DB
@@ -165,7 +166,7 @@ async function handleGenerate(
     ).bind(jobId, requestId, userId || null, body.brandName, provider.imageModel).run();
 
   try {
-    const prompt = buildDallePrompt({
+    let prompt = buildDallePrompt({
       brandName: body.brandName,
       description: body.description || '',
       style: body.style,
@@ -173,6 +174,18 @@ async function handleGenerate(
       layout: body.layout,
       referenceImages: body.referenceImages || [],
     } as import('../../lib/types').WizardData);
+    const kbEnabled = await db.prepare("SELECT value FROM settings WHERE key='knowledgeBaseEnabled'").first<{ value: string }>();
+    if (kbEnabled?.value !== 'false') {
+      const references = await db.prepare(
+        "SELECT category,tags,description FROM knowledge_items WHERE description<>'' ORDER BY created_at DESC LIMIT 8"
+      ).all<Record<string, unknown>>();
+      if (references.results.length) {
+        const guidance = references.results.map((item) =>
+          `[${String(item.category)}] ${String(item.description)}; tags: ${String(item.tags || '[]')}`
+        ).join('\n');
+        prompt += `\n\nCurated studio guidance (inspiration only; do not copy existing marks):\n${guidance}`;
+      }
+    }
 
     const providerHost = new URL(provider.baseUrl).hostname;
     const useSvgGeneration = providerHost === 'api.pesatrouter.com' || !provider.imageModel;

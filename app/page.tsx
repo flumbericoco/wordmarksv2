@@ -470,7 +470,7 @@ export default function Home() {
             <p className="text-3xl font-black tracking-[-0.06em]">wordmarks<span className="text-[#ff5c35]">.</span></p>
             <p className="mt-2 text-xs text-white/35">Names deserve better logos.</p>
           </div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/30">AI-powered typography studio · 2026</p>
+          <div className="flex flex-wrap gap-4 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45"><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refund-policy">Refunds</a><a href="/support">Support</a><span>AI-powered typography studio · 2026</span></div>
         </div>
       </footer>
     </div>

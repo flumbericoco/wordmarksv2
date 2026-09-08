@@ -1,6 +1,6 @@
 import { getUserSession, hashPassword, randomToken, sessionCookie, sha256 } from '../user-auth';
 
-interface Env { DB: D1Database }
+interface Env { DB: D1Database; RESEND_API_KEY?: string; EMAIL_FROM?: string }
 
 const json = (data: unknown, status = 200, headers?: HeadersInit) => Response.json(data, { status, headers });
 
@@ -9,8 +9,50 @@ async function bodyOf(request: Request): Promise<Record<string, unknown>> {
   catch { return {}; }
 }
 
+async function sendEmail(env: Env, to: string, subject: string, html: string, idempotencyKey: string) {
+  if (!env.RESEND_API_KEY) return false;
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey },
+    body: JSON.stringify({ from: env.EMAIL_FROM || 'Wordmarks <onboarding@resend.dev>', to: [to], subject, html }),
+  });
+  if (!response.ok) throw new Error('Unable to send account email');
+  return true;
+}
+
 export const onRequest: PagesFunction<Env> = async ({ request, env, params }) => {
   const action = String((params as { action?: string }).action || '');
+
+  if (action === 'request-reset' && request.method === 'POST') {
+    const body = await bodyOf(request);
+    const email = String(body.email || '').trim().toLowerCase();
+    const found = await env.DB.prepare('SELECT id FROM users WHERE email=?').bind(email).first<{ id: string }>();
+    if (found && env.RESEND_API_KEY) {
+      const token = randomToken();
+      await env.DB.prepare("INSERT INTO auth_tokens(id,user_id,token_hash,purpose,expires_at) VALUES (?,?,?,'password_reset',datetime('now','+1 hour'))")
+        .bind(crypto.randomUUID(), found.id, await sha256(token)).run();
+      const url = `${new URL(request.url).origin}/account/reset?token=${encodeURIComponent(token)}`;
+      await sendEmail(env, email, 'Reset your Wordmarks password', `<p>Use this secure link within one hour:</p><p><a href="${url}">Reset password</a></p>`, `reset-${await sha256(token)}`);
+    }
+    return json({ ok: true, message: 'If the account exists, a reset link has been sent.' });
+  }
+
+  if (action === 'reset-password' && request.method === 'POST') {
+    const body = await bodyOf(request);
+    const token = String(body.token || '');
+    const password = String(body.password || '');
+    if (password.length < 10) return json({ error: 'Password must be at least 10 characters' }, 400);
+    const found = await env.DB.prepare("SELECT id,user_id FROM auth_tokens WHERE token_hash=? AND purpose='password_reset' AND used_at IS NULL AND expires_at>datetime('now')")
+      .bind(await sha256(token)).first<{ id: string; user_id: string }>();
+    if (!found) return json({ error: 'Reset link is invalid or expired' }, 400);
+    const salt = randomToken(16);
+    await env.DB.batch([
+      env.DB.prepare("UPDATE users SET password_hash=?,password_salt=?,updated_at=datetime('now') WHERE id=?").bind(await hashPassword(password, salt), salt, found.user_id),
+      env.DB.prepare("UPDATE auth_tokens SET used_at=datetime('now') WHERE id=?").bind(found.id),
+      env.DB.prepare('DELETE FROM user_sessions WHERE user_id=?').bind(found.user_id),
+    ]);
+    return json({ ok: true });
+  }
 
   if (action === 'register' && request.method === 'POST') {
     const body = await bodyOf(request);

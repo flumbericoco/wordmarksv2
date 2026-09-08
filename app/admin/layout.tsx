@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { href: '/admin/providers', label: 'Providers', short: 'AP', description: 'Models & API keys' },
   { href: '/admin/knowledge-base', label: 'Library', short: 'KB', description: 'Visual references' },
   { href: '/admin/settings', label: 'Settings', short: 'ST', description: 'Generation defaults' },
+  { href: '/admin/billing', label: 'Billing', short: 'BL', description: 'Payments & credits' },
 ];
 
 export default function AdminLayout({ children }: { children: ReactNode }) {

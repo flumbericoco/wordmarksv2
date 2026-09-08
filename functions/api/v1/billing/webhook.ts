@@ -33,6 +33,17 @@ async function addCredits(db: D1Database, userId: string, amount: number, reason
   }
 }
 
+async function revokeAvailableCredits(db: D1Database, userId: string, requested: number, reason: string, reference: string) {
+  const row = await db.prepare('SELECT credits FROM users WHERE id=?').bind(userId).first<{ credits: number }>();
+  const amount = Math.min(Math.max(Number(row?.credits || 0), 0), requested);
+  if (!amount) return;
+  await db.batch([
+    db.prepare("UPDATE users SET credits=credits-?, updated_at=datetime('now') WHERE id=? AND credits>=?").bind(amount, userId, amount),
+    db.prepare('INSERT INTO credit_ledger (id,user_id,amount,reason,reference) VALUES (?,?,?,?,?)')
+      .bind(crypto.randomUUID(), userId, -amount, reason, reference),
+  ]);
+}
+
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const raw = await request.text();
   const signature = request.headers.get('Stripe-Signature') || '';
@@ -57,7 +68,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   try {
 
-  if (event.type === 'checkout.session.completed') {
+  if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
     const metadata = object.metadata as Record<string, string> | undefined;
     const userId = metadata?.user_id;
     const plan = metadata?.plan;
@@ -72,6 +83,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
            VALUES (?, ?, ?, ?, 'trialing')
            ON CONFLICT(stripe_subscription_id) DO UPDATE SET plan=excluded.plan, status='trialing', updated_at=datetime('now')`
         ).bind(crypto.randomUUID(), userId, String(object.subscription || ''), plan),
+        env.DB.prepare(
+          `INSERT INTO payment_transactions
+           (id,user_id,stripe_checkout_id,stripe_payment_intent_id,kind,amount,currency,credits,status)
+           VALUES (?,?,?,?,?,?,?,?, 'paid')
+           ON CONFLICT(stripe_checkout_id) DO UPDATE SET status='paid', updated_at=datetime('now')`
+        ).bind(crypto.randomUUID(), userId, String(object.id), String(object.payment_intent || ''), 'initial_pack', Number(object.amount_total || 0), String(object.currency || 'usd'), 25),
       ]);
     }
   }
@@ -84,6 +101,28 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     if (subscription) {
       const plan = String(subscription.plan);
       await addCredits(env.DB, String(subscription.user_id), monthlyCredits[plan] || 0, 'monthly_renewal', `invoice:${String(object.id)}`);
+      await env.DB.prepare(
+        `INSERT OR IGNORE INTO payment_transactions
+         (id,user_id,stripe_invoice_id,kind,amount,currency,credits,status) VALUES (?,?,?,?,?,?,?,'paid')`
+      ).bind(crypto.randomUUID(), String(subscription.user_id), String(object.id), 'renewal', Number(object.amount_paid || 0), String(object.currency || 'usd'), monthlyCredits[plan] || 0).run();
+    }
+  }
+
+  if (event.type === 'checkout.session.async_payment_failed') {
+    await env.DB.prepare("UPDATE payment_transactions SET status='failed', updated_at=datetime('now') WHERE stripe_checkout_id=?")
+      .bind(String(object.id)).run();
+  }
+
+  if (event.type === 'charge.refunded' || event.type === 'charge.dispute.created') {
+    const paymentIntent = String(object.payment_intent || '');
+    const transaction = paymentIntent
+      ? await env.DB.prepare('SELECT id,user_id,credits FROM payment_transactions WHERE stripe_payment_intent_id=? LIMIT 1').bind(paymentIntent).first<Record<string, unknown>>()
+      : null;
+    if (transaction) {
+      const reason = event.type === 'charge.refunded' ? 'payment_refund' : 'payment_dispute';
+      await revokeAvailableCredits(env.DB, String(transaction.user_id), Number(transaction.credits || 0), reason, `${reason}:${event.id}`);
+      await env.DB.prepare("UPDATE payment_transactions SET status=?, updated_at=datetime('now') WHERE id=?")
+        .bind(event.type === 'charge.refunded' ? 'refunded' : 'disputed', String(transaction.id)).run();
     }
   }
 
