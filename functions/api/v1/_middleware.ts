@@ -81,7 +81,10 @@ export const onRequest = async (context: MiddlewareContext): Promise<Response> =
   }
 
   // Rate limiting
-  const tier = !auth.authenticated ? 'unauthenticated'
+  // Account sessions are validated by their route handler, but should receive
+  // the authenticated rate-limit tier instead of being throttled as visitors.
+  const hasUserSessionCookie = /(?:^|;\s*)wm_session=/.test(request.headers.get('Cookie') || '');
+  const tier = !auth.authenticated && !hasUserSessionCookie ? 'unauthenticated'
     : isAdminRoute ? 'admin'
     : functionPath.includes('generate') ? 'generation'
     : 'authenticated';

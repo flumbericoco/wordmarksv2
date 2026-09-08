@@ -6,6 +6,10 @@ import { FormEvent, useCallback, useEffect, useState } from 'react';
 interface User { id: string; email: string; plan: string; credits: number }
 interface ApiKey { id: string; name: string; key_prefix: string; created_at: string; last_used_at?: string; revoked_at?: string }
 
+class ApiRequestError extends Error {
+  constructor(message: string, readonly status: number) { super(message); }
+}
+
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api/v1/${path}`, {
     ...init,
@@ -13,7 +17,7 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { 'Content-Type': 'application/json', ...init?.headers },
   });
   const payload = await response.json() as T & { error?: string };
-  if (!response.ok) throw new Error(payload.error || 'Request failed');
+  if (!response.ok) throw new ApiRequestError(payload.error || 'Request failed', response.status);
   return payload;
 }
 
@@ -31,19 +35,23 @@ export default function AccountPage() {
     try {
       const me = await api<{ user: User }>('account/me');
       setUser(me.user);
-      const keyData = await api<{ keys: ApiKey[] }>('account/keys');
-      setKeys(keyData.keys);
-    } catch { setUser(null); }
+      try {
+        const keyData = await api<{ keys: ApiKey[] }>('account/keys');
+        setKeys(keyData.keys);
+      } catch (reason) {
+        if (reason instanceof ApiRequestError && reason.status === 401) setUser(null);
+      }
+    } catch (reason) {
+      if (reason instanceof ApiRequestError && reason.status === 401) setUser(null);
+    }
   }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
-    const interval = window.setInterval(() => void load(), 10_000);
     const refreshOnFocus = () => void load();
     window.addEventListener('focus', refreshOnFocus);
     return () => {
       window.clearTimeout(timer);
-      window.clearInterval(interval);
       window.removeEventListener('focus', refreshOnFocus);
     };
   }, [load]);

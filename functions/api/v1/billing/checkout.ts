@@ -18,20 +18,32 @@ const priceKeys = {
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const user = await getUserSession(request, env.DB);
   if (!user) return Response.json({ error: 'Authentication required' }, { status: 401 });
-  if (!env.STRIPE_SECRET_KEY || !env.STRIPE_PRICE_INITIAL_25) {
-    return Response.json({ error: 'Billing is not configured yet' }, { status: 503 });
+  const missingConfiguration = [
+    !env.STRIPE_SECRET_KEY && 'STRIPE_SECRET_KEY',
+    !env.STRIPE_PRICE_INITIAL_25 && 'STRIPE_PRICE_INITIAL_25',
+  ].filter(Boolean);
+  if (missingConfiguration.length > 0) {
+    return Response.json({
+      error: `Billing configuration missing: ${missingConfiguration.join(', ')}`,
+    }, { status: 503 });
   }
+  const stripeSecretKey = env.STRIPE_SECRET_KEY as string;
+  const initialPriceId = env.STRIPE_PRICE_INITIAL_25 as string;
   const body: { plan?: string } = await request.json<{ plan?: string }>().catch(() => ({}));
   const plan = String(body.plan || '').toLowerCase() as keyof typeof priceKeys;
-  const priceId = env[priceKeys[plan]];
-  if (!priceKeys[plan] || !priceId) return Response.json({ error: 'Invalid or unavailable plan' }, { status: 400 });
+  const priceKey = priceKeys[plan];
+  if (!priceKey) return Response.json({ error: 'Invalid plan' }, { status: 400 });
+  const priceId = env[priceKey];
+  if (!priceId) {
+    return Response.json({ error: `Billing configuration missing: ${priceKey}` }, { status: 503 });
+  }
 
   const origin = new URL(request.url).origin;
   const form = new URLSearchParams({
     mode: 'subscription',
     success_url: `${origin}/account?checkout=success`,
     cancel_url: `${origin}/account?checkout=cancelled`,
-    'line_items[0][price]': env.STRIPE_PRICE_INITIAL_25,
+    'line_items[0][price]': initialPriceId,
     'line_items[0][quantity]': '1',
     'line_items[1][price]': priceId,
     'line_items[1][quantity]': '1',
@@ -45,7 +57,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   const stripe = await fetch('https://api.stripe.com/v1/checkout/sessions', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: { Authorization: `Bearer ${stripeSecretKey}`, 'Content-Type': 'application/x-www-form-urlencoded' },
     body: form,
   });
   const session = await stripe.json<Record<string, unknown>>();
