@@ -40,7 +40,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const metadata = object.metadata as Record<string, string> | undefined;
     const userId = metadata?.user_id;
     const plan = metadata?.plan;
-    if (userId && plan) {
+    const paymentStatus = String(object.payment_status || '');
+    if (userId && plan && paymentStatus === 'paid') {
       await addCredits(env.DB, userId, 25, 'initial_credit_pack', `checkout:${String(object.id)}`);
       await env.DB.prepare("UPDATE users SET plan = ?, stripe_customer_id = ?, updated_at = datetime('now') WHERE id = ?")
         .bind(plan, String(object.customer || ''), userId).run();
