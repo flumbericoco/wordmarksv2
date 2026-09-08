@@ -1,9 +1,11 @@
 import { authenticateRequest } from './api/v1/auth';
 import { getApiKeyUser } from './api/v1/user-auth';
+import { checkRateLimit, rateLimitHeaders } from './api/v1/rate-limit';
 
 interface Env {
   DB: D1Database;
   WORDMARKS_MCP_TOKEN?: string;
+  WORDMARKS_KV?: KVNamespace;
 }
 
 interface JsonRpcRequest {
@@ -72,14 +74,13 @@ export const onRequestGet: PagesFunction<Env> = async () => Response.json({
 });
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
-  const auth = authenticateRequest(request, env);
+  const auth = await authenticateRequest(request, env);
   // Always resolve personal keys first. The legacy admin token may inspect the
   // MCP server, but paid logo generation must be attributed to a user account.
   const apiUser = await getApiKeyUser(request, env.DB);
   if (!auth.authenticated && !apiUser) {
     return jsonRpcError(null, -32001, 'Unauthorized. Use a Wordmarks API key.', 401);
   }
-
   let rpc: JsonRpcRequest;
   try {
     rpc = await request.json<JsonRpcRequest>();
@@ -103,6 +104,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (rpc.method === 'tools/list') return jsonRpc(rpc.id, { tools: [TOOL] });
 
   if (rpc.method === 'tools/call') {
+    const limiter = await checkRateLimit(apiUser ? `user:${apiUser.id}` : auth.actor, 'mcp-generation', env, 'generation');
+    if (!limiter.allowed) {
+      return Response.json({ jsonrpc: '2.0', id: rpc.id ?? null, error: { code: -32002, message: 'Rate limit exceeded' } }, {
+        status: 429,
+        headers: rateLimitHeaders(limiter),
+      });
+    }
     if (!apiUser) {
       return jsonRpc(rpc.id, {
         content: [{ type: 'text', text: 'A personal Wordmarks API key (wm_live_...) is required to generate logos and charge credits.' }],
@@ -127,26 +135,40 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       });
     }
 
+    const spendReference = `mcp-generation:${crypto.randomUUID()}`;
+    try {
+      await env.DB.prepare('INSERT INTO credit_ledger (id, user_id, amount, reason, reference) VALUES (?, ?, -1, ?, ?)')
+        .bind(crypto.randomUUID(), apiUser.id, 'logo_generation', spendReference).run();
+    } catch (error) {
+      await env.DB.prepare("UPDATE users SET credits = credits + 1, updated_at = datetime('now') WHERE id = ?").bind(apiUser.id).run();
+      throw error;
+    }
+
     let payload: Record<string, unknown>;
     try {
       const apiUrl = new URL('/api/v1/generate-logo', request.url);
       const apiResponse = await fetch(apiUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${env.WORDMARKS_MCP_TOKEN || ''}`,
+          'X-Request-ID': crypto.randomUUID(),
+        },
         body: JSON.stringify(args),
       });
       payload = await apiResponse.json<Record<string, unknown>>();
       if (!apiResponse.ok || payload.ok !== true) throw new Error(String(payload.error || 'Logo generation failed'));
     } catch (error) {
-      await env.DB.prepare("UPDATE users SET credits = credits + 1, updated_at = datetime('now') WHERE id = ?").bind(apiUser.id).run();
+      await env.DB.batch([
+        env.DB.prepare("UPDATE users SET credits = credits + 1, updated_at = datetime('now') WHERE id = ?").bind(apiUser.id),
+        env.DB.prepare('INSERT OR IGNORE INTO credit_ledger (id, user_id, amount, reason, reference) VALUES (?, ?, 1, ?, ?)')
+          .bind(crypto.randomUUID(), apiUser.id, 'generation_refund', `refund:${spendReference}`),
+      ]);
       return jsonRpc(rpc.id, {
         content: [{ type: 'text', text: error instanceof Error ? error.message : 'Logo generation failed' }],
         isError: true,
       });
     }
-
-    await env.DB.prepare('INSERT INTO credit_ledger (id, user_id, amount, reason, reference) VALUES (?, ?, -1, ?, ?)')
-      .bind(crypto.randomUUID(), apiUser.id, 'logo_generation', crypto.randomUUID()).run();
 
     const data = payload.data as Record<string, unknown>;
     const image = svgContent(data.imageUrl);

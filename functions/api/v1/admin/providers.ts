@@ -34,7 +34,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const { request, env } = context;
   const requestId = request.headers.get('X-Request-ID') || crypto.randomUUID();
 
-  const auth = authenticateRequest(request, env, true);
+  const auth = await authenticateRequest(request, env, true);
   if (!auth.isAdmin) {
     return errorResponse(new UnauthorizedError('Admin authentication required'), requestId);
   }

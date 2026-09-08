@@ -38,6 +38,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     return Response.json({ error: `Billing configuration missing: ${priceKey}` }, { status: 503 });
   }
 
+  const existing = await env.DB.prepare(
+    "SELECT stripe_subscription_id FROM subscriptions WHERE user_id = ? AND status IN ('active', 'trialing', 'past_due') LIMIT 1"
+  ).bind(user.id).first();
+  if (existing) {
+    return Response.json({ error: 'You already have an active subscription. Manage it from the billing portal.' }, { status: 409 });
+  }
+
   const origin = new URL(request.url).origin;
   const form = new URLSearchParams({
     mode: 'subscription',
@@ -59,7 +66,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   const stripe = await fetch('https://api.stripe.com/v1/checkout/sessions', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${stripeSecretKey}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: {
+      Authorization: `Bearer ${stripeSecretKey}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+      // Prevent double-clicks/retries from creating multiple Stripe subscriptions.
+      'Idempotency-Key': `checkout-${user.id}-${plan}-${Math.floor(Date.now() / 600_000)}`,
+    },
     body: form,
   });
   const session = await stripe.json<Record<string, unknown>>();

@@ -19,6 +19,8 @@ import {
   generateImageServer,
   parseJsonResponse,
 } from './providers';
+import { extractToken } from './auth';
+import { getUserSession } from './user-auth';
 
 interface Env {
   DB: D1Database;
@@ -27,6 +29,13 @@ interface Env {
   GENERATED_BUCKET?: R2Bucket;
   OPENAI_API_KEY?: string;
   WORDMARKS_MCP_TOKEN?: string;
+}
+
+function equal(value: string | null, expected?: string): boolean {
+  if (!value || !expected || value.length !== expected.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < value.length; i++) mismatch |= value.charCodeAt(i) ^ expected.charCodeAt(i);
+  return mismatch === 0;
 }
 
 interface FunctionContext {
@@ -103,11 +112,18 @@ function sanitizeGeneratedSvg(raw: string): string {
     throw new Error('PesatRouter did not return a valid SVG wordmark');
   }
 
-  return match[0]
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<foreignObject[\s\S]*?<\/foreignObject>/gi, '')
-    .replace(/\son\w+\s*=\s*(["']).*?\1/gi, '')
-    .replace(/\s(?:href|xlink:href)\s*=\s*(["'])(?:https?:|javascript:).*?\1/gi, '');
+  const svg = match[0];
+  const forbidden = [
+    /<\/?(?:script|foreignObject|iframe|object|embed|audio|video|style)\b/i,
+    /\son[a-z]+\s*=/i,
+    /\s(?:href|xlink:href)\s*=/i,
+    /(?:javascript:|data:text\/html|@import|url\s*\()/i,
+    /<!DOCTYPE|<!ENTITY/i,
+  ];
+  if (forbidden.some((pattern) => pattern.test(svg))) {
+    throw new Error('Generated SVG contained unsafe active content');
+  }
+  return svg;
 }
 
 async function generateSvgWordmark(
@@ -137,17 +153,16 @@ async function handleGenerate(
   generatedBucket: R2Bucket | undefined,
   requestId: string,
   waitUntil: (p: Promise<unknown>) => void,
+  userId?: string,
 ): Promise<unknown> {
   const jobId = crypto.randomUUID();
   const startTime = Date.now();
 
-  // Log job start
-  waitUntil(
-    db.prepare(
-      `INSERT INTO generation_jobs (id, request_id, brand_name, status, model, created_at)
-       VALUES (?, ?, ?, 'running', ?, datetime('now'))`
-    ).bind(jobId, requestId, body.brandName, provider.imageModel).run().catch(() => {})
-  );
+  // Persist the job before starting provider work so later updates cannot race it.
+  await db.prepare(
+      `INSERT INTO generation_jobs (id, request_id, user_id, brand_name, status, model, created_at)
+       VALUES (?, ?, ?, ?, 'running', ?, datetime('now'))`
+    ).bind(jobId, requestId, userId || null, body.brandName, provider.imageModel).run();
 
   try {
     const prompt = buildDallePrompt({
@@ -199,12 +214,10 @@ async function handleGenerate(
     }
 
     // Log job completion (include r2_key if archived)
-    waitUntil(
-      db.prepare(
+    await db.prepare(
         `UPDATE generation_jobs SET status = 'completed', result_url = ?, duration_ms = ?, completed_at = datetime('now')
          WHERE id = ?`
-      ).bind(result.url, duration, jobId).run().catch(() => {})
-    );
+      ).bind(result.url, duration, jobId).run();
 
     return {
       imageUrl: result.url,
@@ -215,12 +228,10 @@ async function handleGenerate(
     const duration = Date.now() - startTime;
     const errorMsg = err instanceof Error ? err.message : 'Unknown error';
 
-    waitUntil(
-      db.prepare(
+    await db.prepare(
         `UPDATE generation_jobs SET status = 'failed', error = ?, duration_ms = ?, completed_at = datetime('now')
          WHERE id = ?`
-      ).bind(errorMsg, duration, jobId).run().catch(() => {})
-    );
+      ).bind(errorMsg, duration, jobId).run().catch(() => undefined);
 
     throw err;
   }
@@ -317,7 +328,42 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       case 'generate-logo': {
         const validated = validateGenerateRequest(body);
         if (!validated.valid) throw new ValidationError(validated.error);
-        data = await handleGenerate(validated.data, provider, env.DB, env.GENERATED_BUCKET, requestId, waitUntil);
+        const internalMcpCall = equal(extractToken(request), env.WORDMARKS_MCP_TOKEN);
+        const user = internalMcpCall ? null : await getUserSession(request, env.DB);
+        if (!internalMcpCall && !user) {
+          return Response.json({ error: 'Sign in and add credits before generating a logo', requestId }, { status: 401 });
+        }
+        let reserved = false;
+        if (user) {
+          const debitReference = `web-generation:${requestId}`;
+          const debit = await env.DB.prepare(
+            "UPDATE users SET credits=credits-1, updated_at=datetime('now') WHERE id=? AND credits>0"
+          ).bind(user.id).run();
+          if (!debit.meta.changes) {
+            return Response.json({ error: 'Insufficient credits', requestId }, { status: 402 });
+          }
+          try {
+            await env.DB.prepare(
+              'INSERT INTO credit_ledger (id,user_id,amount,reason,reference) VALUES (?,?, -1,?,?)'
+            ).bind(crypto.randomUUID(), user.id, 'logo_generation', debitReference).run();
+            reserved = true;
+          } catch (error) {
+            await env.DB.prepare("UPDATE users SET credits=credits+1, updated_at=datetime('now') WHERE id=?").bind(user.id).run();
+            throw error;
+          }
+        }
+        try {
+          data = await handleGenerate(validated.data, provider, env.DB, env.GENERATED_BUCKET, requestId, waitUntil, user?.id);
+        } catch (error) {
+          if (user && reserved) {
+            await env.DB.batch([
+              env.DB.prepare("UPDATE users SET credits=credits+1, updated_at=datetime('now') WHERE id=?").bind(user.id),
+              env.DB.prepare('INSERT OR IGNORE INTO credit_ledger (id,user_id,amount,reason,reference) VALUES (?,?,1,?,?)')
+                .bind(crypto.randomUUID(), user.id, 'generation_refund', `refund:${requestId}`),
+            ]);
+          }
+          throw error;
+        }
         break;
       }
       case 'review-logo': {

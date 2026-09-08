@@ -62,47 +62,56 @@ function getCookie(request: Request, name: string): string | null {
  * NOTE: Full JWT validation requires Cloudflare Access to be configured account-side.
  * For now, we check for the presence of the header as a signal.
  */
-function hasCfAccessJwt(request: Request): boolean {
-  const jwt = request.headers.get('Cf-Access-Jwt-Assertion');
-  return !!jwt && jwt.length > 10;
+const encoder = new TextEncoder();
+
+async function hmac(value: string, secret: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    'raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
+  );
+  const digest = await crypto.subtle.sign('HMAC', key, encoder.encode(value));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+export async function createAdminSession(secret: string, lifetimeSeconds = 60 * 60 * 8): Promise<string> {
+  const expires = Math.floor(Date.now() / 1000) + lifetimeSeconds;
+  const nonce = crypto.randomUUID();
+  const payload = `${expires}.${nonce}`;
+  return `${payload}.${await hmac(payload, secret)}`;
+}
+
+async function validateAdminSession(value: string, secret?: string): Promise<boolean> {
+  if (!secret) return false;
+  const [expiresText, nonce, signature, ...extra] = value.split('.');
+  if (extra.length || !expiresText || !nonce || !signature) return false;
+  const expires = Number(expiresText);
+  if (!Number.isSafeInteger(expires) || expires <= Math.floor(Date.now() / 1000)) return false;
+  return constantTimeEqual(signature, await hmac(`${expiresText}.${nonce}`, secret));
 }
 
 /**
  * Authenticate request and determine authorization level
  */
-export function authenticateRequest(
+export async function authenticateRequest(
   request: Request,
   env: { WORDMARKS_MCP_TOKEN?: string; ADMIN_PASSWORD?: string },
   requireAdmin = false,
-): AuthContext {
+): Promise<AuthContext> {
   const ip = getClientIp(request);
   const token = extractToken(request);
 
   // Admin Studio uses an HttpOnly cookie, so secrets are never stored in JS/localStorage.
   const adminCookie = getCookie(request, 'wm_admin');
-  if (adminCookie && (
-    constantTimeEqual(adminCookie, env.ADMIN_PASSWORD) ||
-    (!env.ADMIN_PASSWORD && constantTimeEqual(adminCookie, env.WORDMARKS_MCP_TOKEN))
-  )) {
+  if (adminCookie && await validateAdminSession(adminCookie, env.ADMIN_PASSWORD)) {
     return { authenticated: true, isAdmin: true, actor: `admin-cookie:${ip}` };
   }
 
-  // Check MCP token
+  // The legacy MCP token authenticates integrations only. It never grants admin access.
   if (token && validateMcpToken(token, env)) {
     return {
       authenticated: true,
-      isAdmin: true,
+      isAdmin: false,
       token,
       actor: `token:${token.slice(0, 8)}...`,
-    };
-  }
-
-  // Check Cloudflare Access JWT
-  if (hasCfAccessJwt(request)) {
-    return {
-      authenticated: true,
-      isAdmin: true, // CF Access is admin-level
-      actor: `cf-access:${ip}`,
     };
   }
 

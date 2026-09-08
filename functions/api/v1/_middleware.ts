@@ -37,8 +37,10 @@ export const onRequest = async (context: MiddlewareContext): Promise<Response> =
   };
 
   // CORS headers (same-origin only)
+  const requestOrigin = request.headers.get('Origin');
+  const sameOrigin = !requestOrigin || requestOrigin === new URL(request.url).origin;
   const corsHeaders: Record<string, string> = {
-    'Access-Control-Allow-Origin': request.headers.get('Origin') || '*',
+    ...(requestOrigin && sameOrigin ? { 'Access-Control-Allow-Origin': requestOrigin, Vary: 'Origin' } : {}),
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Request-ID',
     'Access-Control-Max-Age': '86400',
@@ -46,6 +48,7 @@ export const onRequest = async (context: MiddlewareContext): Promise<Response> =
 
   // Handle preflight
   if (request.method === 'OPTIONS') {
+    if (!sameOrigin) return new Response(null, { status: 403 });
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
@@ -72,7 +75,7 @@ export const onRequest = async (context: MiddlewareContext): Promise<Response> =
   const isAdminRoute = functionPath.includes('/admin/');
 
   // Authenticate
-  const auth: AuthContext = authenticateRequest(request, env, isAdminRoute);
+  const auth: AuthContext = await authenticateRequest(request, env, isAdminRoute);
 
   if (isAdminRoute && !auth.isAdmin) {
     return addHeaders(
@@ -83,13 +86,17 @@ export const onRequest = async (context: MiddlewareContext): Promise<Response> =
   // Rate limiting
   // Account sessions are validated by their route handler, but should receive
   // the authenticated rate-limit tier instead of being throttled as visitors.
-  const hasUserSessionCookie = /(?:^|;\s*)wm_session=/.test(request.headers.get('Cookie') || '');
-  const tier = !auth.authenticated && !hasUserSessionCookie ? 'unauthenticated'
+  const tier = !auth.authenticated ? 'unauthenticated'
     : isAdminRoute ? 'admin'
     : functionPath.includes('generate') ? 'generation'
     : 'authenticated';
 
-  const rlResult = await checkRateLimit(auth.actor, functionPath, env, tier);
+  // Stripe authenticates webhook requests with its signature in the handler;
+  // IP-based middleware throttling could drop legitimate event bursts.
+  const isStripeWebhook = functionPath.endsWith('/billing/webhook');
+  const rlResult = isStripeWebhook
+    ? { allowed: true, remaining: 1, limit: 1, resetAt: Date.now() + 60_000 }
+    : await checkRateLimit(auth.actor, functionPath, env, tier);
 
   if (!rlResult.allowed) {
     const err = new RateLimitError(rlResult.retryAfter || 60);
@@ -119,6 +126,11 @@ export const onRequest = async (context: MiddlewareContext): Promise<Response> =
   // Add CORS + rate limit + request ID headers
   const finalHeaders = new Headers(response.headers);
   Object.entries(corsHeaders).forEach(([k, v]) => finalHeaders.set(k, v));
+  finalHeaders.set('X-Content-Type-Options', 'nosniff');
+  finalHeaders.set('X-Frame-Options', 'DENY');
+  finalHeaders.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  finalHeaders.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  finalHeaders.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   finalHeaders.set('X-Request-ID', requestId);
   Object.entries(rateLimitHeaders(rlResult)).forEach(([k, v]) => finalHeaders.set(k, v));
 

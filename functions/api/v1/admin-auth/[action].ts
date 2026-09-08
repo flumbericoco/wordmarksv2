@@ -1,4 +1,4 @@
-import { authenticateRequest } from '../auth';
+import { authenticateRequest, createAdminSession } from '../auth';
 
 interface Env {
   ADMIN_PASSWORD?: string;
@@ -22,11 +22,14 @@ export const onRequest: PagesFunction<Env> = async ({ request, env, params }) =>
   if (action === 'login' && request.method === 'POST') {
     const body: { password?: string } = await request.json<{ password?: string }>().catch(() => ({}));
     const password = String(body.password || '');
-    const expected = env.ADMIN_PASSWORD || env.WORDMARKS_MCP_TOKEN;
+    const expected = env.ADMIN_PASSWORD;
+    if (!expected) {
+      return Response.json({ ok: false, error: 'Admin login is not configured' }, { status: 503 });
+    }
     if (!equal(password, expected)) {
       return Response.json({ ok: false, error: 'Invalid admin password' }, { status: 401 });
     }
-    return Response.json({ ok: true }, { headers: { 'Set-Cookie': adminCookie(password) } });
+    return Response.json({ ok: true }, { headers: { 'Set-Cookie': adminCookie(await createAdminSession(expected)) } });
   }
 
   if (action === 'logout' && request.method === 'POST') {
@@ -34,7 +37,7 @@ export const onRequest: PagesFunction<Env> = async ({ request, env, params }) =>
   }
 
   if (action === 'session' && request.method === 'GET') {
-    const auth = authenticateRequest(request, env, true);
+    const auth = await authenticateRequest(request, env, true);
     return Response.json({ ok: auth.isAdmin }, { status: auth.isAdmin ? 200 : 401 });
   }
 

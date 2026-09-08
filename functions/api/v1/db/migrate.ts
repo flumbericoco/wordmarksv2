@@ -2,10 +2,12 @@
 // Run: POST /api/v1/admin/migrate with admin auth
 
 import { successResponse, errorResponse, ValidationError } from '../../../lib/errors';
+import { authenticateRequest, requireAdmin } from '../auth';
 
 interface Env {
   DB: D1Database;
   WORDMARKS_MCP_TOKEN?: string;
+  ADMIN_PASSWORD?: string;
 }
 
 interface FunctionContext {
@@ -48,6 +50,7 @@ CREATE TABLE IF NOT EXISTS knowledge_items (
 CREATE TABLE IF NOT EXISTS generation_jobs (
   id TEXT PRIMARY KEY,
   request_id TEXT NOT NULL,
+  user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
   brand_name TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending',
   provider_id TEXT,
@@ -84,6 +87,7 @@ CREATE TABLE IF NOT EXISTS audit_events (
 
 CREATE INDEX IF NOT EXISTS idx_generation_jobs_status ON generation_jobs(status);
 CREATE INDEX IF NOT EXISTS idx_generation_jobs_created ON generation_jobs(created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_generation_jobs_request ON generation_jobs(request_id);
 CREATE INDEX IF NOT EXISTS idx_usage_counters_token ON usage_counters(token, action);
 CREATE INDEX IF NOT EXISTS idx_audit_events_type ON audit_events(event_type);
 CREATE INDEX IF NOT EXISTS idx_audit_events_created ON audit_events(created_at);
@@ -95,6 +99,7 @@ CREATE TABLE IF NOT EXISTS users (
   credits INTEGER NOT NULL DEFAULT 0 CHECK (credits >= 0), stripe_customer_id TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+ALTER TABLE generation_jobs ADD COLUMN user_id TEXT REFERENCES users(id) ON DELETE SET NULL;
 CREATE TABLE IF NOT EXISTS user_sessions (
   id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   token_hash TEXT NOT NULL UNIQUE, expires_at TEXT NOT NULL,
@@ -115,10 +120,17 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   stripe_subscription_id TEXT UNIQUE, plan TEXT NOT NULL, status TEXT NOT NULL,
   current_period_end TEXT, updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS payment_events (
+  event_id TEXT PRIMARY KEY, event_type TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('processing', 'processed', 'failed')),
+  error TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), processed_at TEXT
+);
 CREATE INDEX IF NOT EXISTS idx_sessions_token ON user_sessions(token_hash);
 CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
 CREATE INDEX IF NOT EXISTS idx_api_keys_user ON api_keys(user_id);
 CREATE INDEX IF NOT EXISTS idx_credit_ledger_user ON credit_ledger(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(user_id, status);
+CREATE INDEX IF NOT EXISTS idx_payment_events_status ON payment_events(status, created_at);
 `;
 
 export const onRequest: PagesFunction<Env> = async (context) => {
@@ -126,6 +138,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const requestId = request.headers.get('X-Request-ID') || crypto.randomUUID();
 
   try {
+    requireAdmin(await authenticateRequest(request, env, true));
     if (request.method !== 'POST') {
       throw new ValidationError('Only POST method is allowed');
     }

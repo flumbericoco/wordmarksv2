@@ -9,7 +9,7 @@ export const onRequest: PagesFunction<Env> = async ({ request, env, next }) => {
   const url = new URL(request.url);
   if (url.pathname === '/admin/login' || url.pathname.startsWith('/admin/login/')) return next();
 
-  const auth = authenticateRequest(request, env, true);
+  const auth = await authenticateRequest(request, env, true);
   if (auth.isAdmin) return next();
 
   const login = new URL('/admin/login', url.origin);

@@ -27,10 +27,12 @@ export const onRequest: PagesFunction<Env> = async ({ request, env, params }) =>
     const token = randomToken();
     const tokenHash = await sha256(token);
     await env.DB.batch([
-      env.DB.prepare('INSERT INTO users (id, email, password_hash, password_salt) VALUES (?, ?, ?, ?)').bind(id, email, passwordHash, salt),
+      env.DB.prepare('INSERT INTO users (id, email, password_hash, password_salt, credits) VALUES (?, ?, ?, ?, 10)').bind(id, email, passwordHash, salt),
       env.DB.prepare("INSERT INTO user_sessions (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, datetime('now', '+30 days'))").bind(crypto.randomUUID(), id, tokenHash),
+      env.DB.prepare("INSERT INTO credit_ledger (id,user_id,amount,reason,reference) VALUES (?,?,10,'signup_bonus',?)")
+        .bind(crypto.randomUUID(), id, `signup:${id}`),
     ]);
-    return json({ ok: true, user: { id, email, plan: 'none', credits: 0 } }, 201, { 'Set-Cookie': sessionCookie(token) });
+    return json({ ok: true, user: { id, email, plan: 'none', credits: 10 } }, 201, { 'Set-Cookie': sessionCookie(token) });
   }
 
   if (action === 'login' && request.method === 'POST') {

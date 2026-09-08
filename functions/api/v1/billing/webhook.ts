@@ -20,10 +20,16 @@ async function verifySignature(raw: string, header: string, secret: string): Pro
 }
 
 async function addCredits(db: D1Database, userId: string, amount: number, reason: string, reference: string) {
-  const inserted = await db.prepare('INSERT OR IGNORE INTO credit_ledger (id, user_id, amount, reason, reference) VALUES (?, ?, ?, ?, ?)')
-    .bind(crypto.randomUUID(), userId, amount, reason, reference).run();
-  if (inserted.meta.changes) {
-    await db.prepare("UPDATE users SET credits = credits + ?, updated_at = datetime('now') WHERE id = ?").bind(amount, userId).run();
+  try {
+    await db.batch([
+      db.prepare('INSERT INTO credit_ledger (id, user_id, amount, reason, reference) VALUES (?, ?, ?, ?, ?)')
+        .bind(crypto.randomUUID(), userId, amount, reason, reference),
+      db.prepare("UPDATE users SET credits = credits + ?, updated_at = datetime('now') WHERE id = ?").bind(amount, userId),
+    ]);
+  } catch (error) {
+    // A unique reference means this exact benefit was already granted atomically.
+    const existing = await db.prepare('SELECT id FROM credit_ledger WHERE reference = ?').bind(reference).first();
+    if (!existing) throw error;
   }
 }
 
@@ -36,6 +42,21 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const event = JSON.parse(raw) as { id: string; type: string; data: { object: Record<string, unknown> } };
   const object = event.data.object;
 
+  let claimed = await env.DB.prepare(
+    "INSERT OR IGNORE INTO payment_events (event_id, event_type, status) VALUES (?, ?, 'processing')"
+  ).bind(event.id, event.type).run();
+  if (!claimed.meta.changes) {
+    const previous = await env.DB.prepare('SELECT status FROM payment_events WHERE event_id=?').bind(event.id).first<{ status: string }>();
+    if (previous?.status === 'processed' || previous?.status === 'processing') {
+      return Response.json({ received: true, duplicate: true });
+    }
+    claimed = await env.DB.prepare("UPDATE payment_events SET status='processing', error=NULL WHERE event_id=? AND status='failed'")
+      .bind(event.id).run();
+    if (!claimed.meta.changes) return Response.json({ received: true, duplicate: true });
+  }
+
+  try {
+
   if (event.type === 'checkout.session.completed') {
     const metadata = object.metadata as Record<string, string> | undefined;
     const userId = metadata?.user_id;
@@ -43,13 +64,15 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const paymentStatus = String(object.payment_status || '');
     if (userId && plan && paymentStatus === 'paid') {
       await addCredits(env.DB, userId, 25, 'initial_credit_pack', `checkout:${String(object.id)}`);
-      await env.DB.prepare("UPDATE users SET plan = ?, stripe_customer_id = ?, updated_at = datetime('now') WHERE id = ?")
-        .bind(plan, String(object.customer || ''), userId).run();
-      await env.DB.prepare(
-        `INSERT INTO subscriptions (id, user_id, stripe_subscription_id, plan, status)
-         VALUES (?, ?, ?, ?, 'active')
-         ON CONFLICT(stripe_subscription_id) DO UPDATE SET plan=excluded.plan, status='active', updated_at=datetime('now')`
-      ).bind(crypto.randomUUID(), userId, String(object.subscription || ''), plan).run();
+      await env.DB.batch([
+        env.DB.prepare("UPDATE users SET plan = ?, stripe_customer_id = ?, updated_at = datetime('now') WHERE id = ?")
+          .bind(plan, String(object.customer || ''), userId),
+        env.DB.prepare(
+          `INSERT INTO subscriptions (id, user_id, stripe_subscription_id, plan, status)
+           VALUES (?, ?, ?, ?, 'trialing')
+           ON CONFLICT(stripe_subscription_id) DO UPDATE SET plan=excluded.plan, status='trialing', updated_at=datetime('now')`
+        ).bind(crypto.randomUUID(), userId, String(object.subscription || ''), plan),
+      ]);
     }
   }
 
@@ -75,8 +98,36 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   }
 
   if (event.type === 'customer.subscription.deleted') {
-    await env.DB.prepare("UPDATE subscriptions SET status='cancelled', updated_at=datetime('now') WHERE stripe_subscription_id = ?")
-      .bind(String(object.id)).run();
+    const subscriptionId = String(object.id);
+    const subscription = await env.DB.prepare('SELECT user_id FROM subscriptions WHERE stripe_subscription_id = ?')
+      .bind(subscriptionId).first<Record<string, unknown>>();
+    if (subscription) {
+      await env.DB.batch([
+        env.DB.prepare("UPDATE subscriptions SET status='cancelled', updated_at=datetime('now') WHERE stripe_subscription_id = ?").bind(subscriptionId),
+        env.DB.prepare("UPDATE users SET plan='none', updated_at=datetime('now') WHERE id = ?").bind(String(subscription.user_id)),
+      ]);
+    }
+  }
+
+  if (event.type === 'customer.subscription.updated') {
+    const metadata = object.metadata as Record<string, string> | undefined;
+    const status = String(object.status || 'unknown');
+    const plan = metadata?.plan;
+    await env.DB.prepare(
+      "UPDATE subscriptions SET status=?, current_period_end=?, updated_at=datetime('now') WHERE stripe_subscription_id=?"
+    ).bind(status, object.current_period_end ? new Date(Number(object.current_period_end) * 1000).toISOString() : null, String(object.id)).run();
+    if (plan && ['active', 'trialing'].includes(status)) {
+      await env.DB.prepare("UPDATE users SET plan=?, updated_at=datetime('now') WHERE id=(SELECT user_id FROM subscriptions WHERE stripe_subscription_id=?)")
+        .bind(plan, String(object.id)).run();
+    }
+  }
+
+  await env.DB.prepare("UPDATE payment_events SET status='processed', processed_at=datetime('now') WHERE event_id=?")
+    .bind(event.id).run();
+  } catch (error) {
+    await env.DB.prepare("UPDATE payment_events SET status='failed', error=?, processed_at=datetime('now') WHERE event_id=?")
+      .bind(error instanceof Error ? error.message : String(error), event.id).run().catch(() => undefined);
+    throw error;
   }
 
   return Response.json({ received: true });
