@@ -73,7 +73,9 @@ export const onRequestGet: PagesFunction<Env> = async () => Response.json({
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const auth = authenticateRequest(request, env);
-  const apiUser = auth.authenticated ? null : await getApiKeyUser(request, env.DB);
+  // Always resolve personal keys first. The legacy admin token may inspect the
+  // MCP server, but paid logo generation must be attributed to a user account.
+  const apiUser = await getApiKeyUser(request, env.DB);
   if (!auth.authenticated && !apiUser) {
     return jsonRpcError(null, -32001, 'Unauthorized. Use a Wordmarks API key.', 401);
   }
@@ -101,6 +103,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (rpc.method === 'tools/list') return jsonRpc(rpc.id, { tools: [TOOL] });
 
   if (rpc.method === 'tools/call') {
+    if (!apiUser) {
+      return jsonRpc(rpc.id, {
+        content: [{ type: 'text', text: 'A personal Wordmarks API key (wm_live_...) is required to generate logos and charge credits.' }],
+        isError: true,
+      });
+    }
+
     const name = rpc.params?.name;
     const args = rpc.params?.arguments;
     if (name !== TOOL.name) return jsonRpcError(rpc.id, -32602, `Unknown tool: ${String(name)}`);
@@ -108,16 +117,14 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       return jsonRpcError(rpc.id, -32602, 'Tool arguments must be an object');
     }
 
-    if (apiUser) {
-      const reserved = await env.DB.prepare(
-        "UPDATE users SET credits = credits - 1, updated_at = datetime('now') WHERE id = ? AND credits > 0"
-      ).bind(apiUser.id).run();
-      if (!reserved.meta.changes) {
-        return jsonRpc(rpc.id, {
-          content: [{ type: 'text', text: 'Insufficient credits. Top up your Wordmarks account.' }],
-          isError: true,
-        });
-      }
+    const reserved = await env.DB.prepare(
+      "UPDATE users SET credits = credits - 1, updated_at = datetime('now') WHERE id = ? AND credits > 0"
+    ).bind(apiUser.id).run();
+    if (!reserved.meta.changes) {
+      return jsonRpc(rpc.id, {
+        content: [{ type: 'text', text: 'Insufficient credits. Top up your Wordmarks account.' }],
+        isError: true,
+      });
     }
 
     let payload: Record<string, unknown>;
@@ -131,19 +138,15 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       payload = await apiResponse.json<Record<string, unknown>>();
       if (!apiResponse.ok || payload.ok !== true) throw new Error(String(payload.error || 'Logo generation failed'));
     } catch (error) {
-      if (apiUser) {
-        await env.DB.prepare("UPDATE users SET credits = credits + 1, updated_at = datetime('now') WHERE id = ?").bind(apiUser.id).run();
-      }
+      await env.DB.prepare("UPDATE users SET credits = credits + 1, updated_at = datetime('now') WHERE id = ?").bind(apiUser.id).run();
       return jsonRpc(rpc.id, {
         content: [{ type: 'text', text: error instanceof Error ? error.message : 'Logo generation failed' }],
         isError: true,
       });
     }
 
-    if (apiUser) {
-      await env.DB.prepare('INSERT INTO credit_ledger (id, user_id, amount, reason, reference) VALUES (?, ?, -1, ?, ?)')
-        .bind(crypto.randomUUID(), apiUser.id, 'logo_generation', crypto.randomUUID()).run();
-    }
+    await env.DB.prepare('INSERT INTO credit_ledger (id, user_id, amount, reason, reference) VALUES (?, ?, -1, ?, ?)')
+      .bind(crypto.randomUUID(), apiUser.id, 'logo_generation', crypto.randomUUID()).run();
 
     const data = payload.data as Record<string, unknown>;
     const image = svgContent(data.imageUrl);

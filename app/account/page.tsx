@@ -38,7 +38,14 @@ export default function AccountPage() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
-    return () => window.clearTimeout(timer);
+    const interval = window.setInterval(() => void load(), 10_000);
+    const refreshOnFocus = () => void load();
+    window.addEventListener('focus', refreshOnFocus);
+    return () => {
+      window.clearTimeout(timer);
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshOnFocus);
+    };
   }, [load]);
 
   async function submitAuth(event: FormEvent) {
@@ -141,7 +148,7 @@ export default function AccountPage() {
           <div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[0.18em] text-[#5b42d5]">Developer API keys</p><h2 className="mt-2 text-3xl font-black tracking-[-0.05em]">Connect your AI agents</h2></div><button disabled={busy} onClick={createKey} className="rounded-full bg-[#171714] px-5 py-3 text-xs font-black uppercase tracking-wider text-white disabled:opacity-50">Create API key</button></div>
           <div className="mt-6 divide-y divide-black/10 border-y border-black/10">
             {keys.length === 0 ? <p className="py-6 text-sm text-black/45">No API keys yet.</p> : keys.map((key) => (
-              <div key={key.id} className="flex items-center justify-between gap-4 py-4"><div><p className="font-bold">{key.name}</p><code className="text-xs text-black/45">{key.key_prefix}</code></div>{key.revoked_at ? <span className="text-xs text-red-600">Revoked</span> : <button onClick={() => revokeKey(key.id)} className="text-xs font-bold text-red-700">Revoke</button>}</div>
+              <div key={key.id} className="flex items-center justify-between gap-4 py-4"><div><p className="font-bold">{key.name}</p><code className="text-xs text-black/45">{key.key_prefix}</code><p className="mt-1 text-[11px] text-black/40">{key.last_used_at ? `Last used ${new Date(`${key.last_used_at}Z`).toLocaleString()}` : 'Never used'}</p></div>{key.revoked_at ? <span className="text-xs text-red-600">Revoked</span> : <button onClick={() => revokeKey(key.id)} className="text-xs font-bold text-red-700">Revoke</button>}</div>
             ))}
           </div>
           <div className="mt-6 rounded-2xl bg-[#171714] p-5 text-xs leading-6 text-white/65"><code>Authorization: Bearer wm_live_your_key</code><br /><code>https://wordmarks-v2-dz1.pages.dev/mcp</code></div>
