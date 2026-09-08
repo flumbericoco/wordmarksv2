@@ -21,7 +21,7 @@ const PRESETS: Partial<AdminProvider>[] = [
 export default function ProvidersPage() {
   const [providers, setProviders] = useState<AdminProvider[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
-  const [form, setForm] = useState<Partial<AdminProvider & { apiKey?: string }>>({});
+  const [form, setForm] = useState<Partial<AdminProvider>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,10 +45,9 @@ export default function ProvidersPage() {
   }, []);
 
   const handleAdd = (preset?: Partial<AdminProvider>) => {
-    const newProvider: Partial<AdminProvider & { apiKey?: string }> = {
+    const newProvider: Partial<AdminProvider> = {
       name: preset?.name || '',
       baseUrl: preset?.baseUrl || '',
-      apiKey: '',
       textModel: preset?.textModel || '',
       imageModel: preset?.imageModel || '',
       isActive: providers.length === 0,
@@ -65,7 +64,6 @@ export default function ProvidersPage() {
         await createProvider({
           name: form.name || '',
           baseUrl: form.baseUrl || '',
-          apiKey: form.apiKey,
           textModel: form.textModel || '',
           imageModel: form.imageModel,
           isActive: form.isActive,
@@ -170,15 +168,8 @@ export default function ProvidersPage() {
                       />
                     </div>
                   </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-400">API Key (stored server-side)</label>
-                    <input
-                      type="password"
-                      value={form.apiKey || ''}
-                      onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
-                      placeholder="sk-..."
-                      className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-zinc-600 outline-none focus:border-blue-500/50"
-                    />
+                  <div className="rounded-lg border border-black/10 bg-black/[0.04] px-4 py-3 text-xs text-black/55">
+                    Provider credentials are managed securely through the Cloudflare <code>OPENAI_API_KEY</code> secret and are never exposed here.
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>

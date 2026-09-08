@@ -104,7 +104,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
       const { results } = await stmt.all();
       return successResponse(
-        results.map((r) => redactItem(r as Record<string, unknown>)),
+        // Include image data for the authenticated Admin Studio preview. This
+        // deployment uses D1 as its free-tier image fallback (R2 is optional).
+        results.map((r) => redactItem(r as Record<string, unknown>, true)),
         requestId,
       );
     }

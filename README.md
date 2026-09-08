@@ -54,6 +54,7 @@ Secrets are stored as Cloudflare Pages secrets. **Never commit values to the rep
 |-------------|---------|------------|
 | `OPENAI_API_KEY` | OpenAI API access | `wrangler pages secret put OPENAI_API_KEY --project-name=wordmarks-v2` |
 | `WORDMARKS_MCP_TOKEN` | Auth token for API/MCP agents | `wrangler pages secret put WORDMARKS_MCP_TOKEN --project-name=wordmarks-v2` |
+| `ADMIN_PASSWORD` | Private Admin Studio password (MCP token fallback when omitted) | `wrangler pages secret put ADMIN_PASSWORD --project-name=wordmarks-v2` |
 | `STRIPE_SECRET_KEY` | Stripe server API key | Cloudflare Pages secret |
 | `STRIPE_WEBHOOK_SECRET` | Signature verification for `/api/v1/billing/webhook` | Cloudflare Pages secret |
 | `STRIPE_PRICE_INITIAL_25` | One-time $25 credit pack Price ID | Cloudflare Pages secret |

@@ -41,6 +41,22 @@ function validateMcpToken(token: string, env: { WORDMARKS_MCP_TOKEN?: string }):
   return result === 0;
 }
 
+function constantTimeEqual(value: string, expected?: string): boolean {
+  if (!expected || value.length !== expected.length) return false;
+  let result = 0;
+  for (let i = 0; i < value.length; i++) result |= value.charCodeAt(i) ^ expected.charCodeAt(i);
+  return result === 0;
+}
+
+function getCookie(request: Request, name: string): string | null {
+  const cookie = request.headers.get('Cookie') || '';
+  for (const part of cookie.split(';')) {
+    const [key, ...rest] = part.trim().split('=');
+    if (key === name) return decodeURIComponent(rest.join('='));
+  }
+  return null;
+}
+
 /**
  * Check if request has valid Cloudflare Access JWT
  * NOTE: Full JWT validation requires Cloudflare Access to be configured account-side.
@@ -56,11 +72,20 @@ function hasCfAccessJwt(request: Request): boolean {
  */
 export function authenticateRequest(
   request: Request,
-  env: { WORDMARKS_MCP_TOKEN?: string },
+  env: { WORDMARKS_MCP_TOKEN?: string; ADMIN_PASSWORD?: string },
   requireAdmin = false,
 ): AuthContext {
   const ip = getClientIp(request);
   const token = extractToken(request);
+
+  // Admin Studio uses an HttpOnly cookie, so secrets are never stored in JS/localStorage.
+  const adminCookie = getCookie(request, 'wm_admin');
+  if (adminCookie && (
+    constantTimeEqual(adminCookie, env.ADMIN_PASSWORD) ||
+    (!env.ADMIN_PASSWORD && constantTimeEqual(adminCookie, env.WORDMARKS_MCP_TOKEN))
+  )) {
+    return { authenticated: true, isAdmin: true, actor: `admin-cookie:${ip}` };
+  }
 
   // Check MCP token
   if (token && validateMcpToken(token, env)) {

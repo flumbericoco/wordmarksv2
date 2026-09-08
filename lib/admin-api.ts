@@ -18,6 +18,7 @@ async function adminCall<T>(
 ): Promise<T> {
   const options: RequestInit = {
     method,
+    credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
   };
   if (body && method !== 'GET') {
@@ -26,6 +27,11 @@ async function adminCall<T>(
 
   const res = await fetch(`${ADMIN_API_BASE}/${endpoint}`, options);
   const data = await res.json() as AdminApiResponse<T>;
+
+  if (res.status === 401 && typeof window !== 'undefined') {
+    window.location.assign(`/admin/login?next=${encodeURIComponent(window.location.pathname)}`);
+    throw new Error('Admin session expired');
+  }
 
   if (!data.ok) {
     throw new Error(data.error || `Admin request failed (${res.status})`);
@@ -164,7 +170,12 @@ export async function getStats(): Promise<AdminStats> {
 // ─── Export API ──────────────────────────────────────────
 
 export async function exportData(): Promise<Blob> {
-  const res = await fetch(`${ADMIN_API_BASE}/export`);
+  const res = await fetch(`${ADMIN_API_BASE}/export`, { credentials: 'same-origin' });
+  if (res.status === 401 && typeof window !== 'undefined') {
+    window.location.assign(`/admin/login?next=${encodeURIComponent(window.location.pathname)}`);
+    throw new Error('Admin session expired');
+  }
+  if (!res.ok) throw new Error(`Export failed (${res.status})`);
   return res.blob();
 }
 

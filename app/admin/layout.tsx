@@ -14,6 +14,13 @@ const NAV_ITEMS = [
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
+  if (pathname === '/admin/login') return children;
+
+  async function logout() {
+    await fetch('/api/v1/admin-auth/logout', { method: 'POST', credentials: 'same-origin' });
+    window.location.assign('/admin/login');
+  }
+
   return (
     <div className="admin-shell min-h-screen bg-[#eeece5] text-[#191916]">
       <header className="sticky top-0 z-50 border-b border-black/10 bg-[#eeece5]/90 backdrop-blur-xl">
@@ -24,6 +31,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           </Link>
           <div className="flex items-center gap-4">
             <span className="hidden items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em] text-black/45 sm:flex"><span className="h-2 w-2 animate-pulse rounded-full bg-[#61c454]" /> System online</span>
+            <button onClick={logout} className="text-[10px] font-black uppercase tracking-[0.14em] text-black/45 hover:text-black">Sign out</button>
             <Link href="/" className="rounded-full bg-[#191916] px-4 py-2.5 text-xs font-bold text-white transition-transform hover:-translate-y-0.5">View website ↗</Link>
           </div>
         </div>
