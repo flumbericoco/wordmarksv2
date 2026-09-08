@@ -5,6 +5,10 @@ import { FormEvent, useCallback, useEffect, useState } from 'react';
 
 interface User { id: string; email: string; plan: string; credits: number }
 interface ApiKey { id: string; name: string; key_prefix: string; created_at: string; last_used_at?: string; revoked_at?: string }
+interface Subscription { id: string; plan: string; status: string; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean }
+interface Invoice { id: string; number: string; status: string; amountPaid: number; currency: string; createdAt: string; hostedUrl: string | null }
+interface CreditEntry { id: string; amount: number; reason: string; created_at: string }
+interface BillingData { subscription: Subscription | null; invoices: Invoice[]; creditHistory: CreditEntry[] }
 
 class ApiRequestError extends Error {
   constructor(message: string, readonly status: number) { super(message); }
@@ -28,7 +32,14 @@ export default function AccountPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [newToken, setNewToken] = useState('');
-  const [message, setMessage] = useState('');
+  const [billing, setBilling] = useState<BillingData>({ subscription: null, invoices: [], creditHistory: [] });
+  const [message, setMessage] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    const checkoutState = new URLSearchParams(window.location.search).get('checkout');
+    if (checkoutState === 'success') return 'Payment received. Credits may take a few seconds to appear.';
+    if (checkoutState === 'cancelled') return 'Checkout cancelled. You were not charged.';
+    return '';
+  });
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -38,6 +49,12 @@ export default function AccountPage() {
       try {
         const keyData = await api<{ keys: ApiKey[] }>('account/keys');
         setKeys(keyData.keys);
+      } catch (reason) {
+        if (reason instanceof ApiRequestError && reason.status === 401) setUser(null);
+      }
+      try {
+        const billingData = await api<BillingData>('billing/status');
+        setBilling(billingData);
       } catch (reason) {
         if (reason instanceof ApiRequestError && reason.status === 401) setUser(null);
       }
@@ -94,6 +111,14 @@ export default function AccountPage() {
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Checkout unavailable'); setBusy(false); }
   }
 
+  async function openBillingPortal() {
+    setBusy(true); setMessage('');
+    try {
+      const result = await api<{ url: string }>('billing/portal', { method: 'POST' });
+      window.location.assign(result.url);
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Billing portal unavailable'); setBusy(false); }
+  }
+
   if (!user) {
     return (
       <main className="grid min-h-screen place-items-center bg-[#d9d3ff] px-5 py-16 text-[#171714]">
@@ -144,6 +169,28 @@ export default function AccountPage() {
         </section>
 
         {message ? <p role="alert" className="mb-5 rounded-xl bg-red-100 p-4 text-sm text-red-800">{message}</p> : null}
+        <section className="mb-6 grid gap-5 md:grid-cols-2">
+          <div className="rounded-[2rem] border border-black/10 bg-white/60 p-7">
+            <div className="flex items-start justify-between gap-4">
+              <div><p className="text-xs font-black uppercase tracking-[0.18em] text-[#5b42d5]">Subscription</p><h2 className="mt-2 text-3xl font-black capitalize">{billing.subscription?.plan || 'No active plan'}</h2></div>
+              {billing.subscription ? <span className="rounded-full bg-[#c6ff4a] px-3 py-1 text-[10px] font-black uppercase">{billing.subscription.status}</span> : null}
+            </div>
+            {billing.subscription?.currentPeriodEnd ? <p className="mt-4 text-sm text-black/55">Next billing date: {new Date(billing.subscription.currentPeriodEnd).toLocaleDateString()}</p> : <p className="mt-4 text-sm text-black/45">Choose a plan above to activate monthly credits.</p>}
+            {billing.subscription?.cancelAtPeriodEnd ? <p className="mt-2 text-sm font-bold text-orange-700">Cancellation scheduled at the end of this period.</p> : null}
+            {billing.subscription ? <button disabled={busy} onClick={openBillingPortal} className="mt-5 rounded-full bg-[#171714] px-5 py-3 text-xs font-black uppercase tracking-wider text-white disabled:opacity-50">Manage billing</button> : null}
+          </div>
+          <div className="rounded-[2rem] border border-black/10 bg-white/60 p-7">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#5b42d5]">Recent credit activity</p>
+            <div className="mt-4 divide-y divide-black/10">
+              {billing.creditHistory.length === 0 ? <p className="py-4 text-sm text-black/45">No credit activity yet.</p> : billing.creditHistory.slice(0, 5).map((entry) => <div key={entry.id} className="flex justify-between gap-4 py-3 text-sm"><span className="capitalize text-black/60">{entry.reason.replaceAll('_', ' ')}</span><span className={entry.amount > 0 ? 'font-bold text-green-700' : 'font-bold text-red-700'}>{entry.amount > 0 ? '+' : ''}{entry.amount}</span></div>)}
+            </div>
+          </div>
+        </section>
+
+        {billing.invoices.length > 0 ? <section className="mb-6 rounded-[2rem] border border-black/10 bg-white/60 p-7">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-[#5b42d5]">Payment history</p>
+          <div className="mt-4 divide-y divide-black/10">{billing.invoices.map((invoice) => <div key={invoice.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm"><div><p className="font-bold">{invoice.number || 'Stripe invoice'}</p><p className="text-xs text-black/45">{new Date(invoice.createdAt).toLocaleDateString()} · {invoice.status}</p></div><div className="flex items-center gap-4"><strong>{invoice.currency} {(invoice.amountPaid / 100).toFixed(2)}</strong>{invoice.hostedUrl ? <a href={invoice.hostedUrl} target="_blank" rel="noreferrer" className="text-xs font-bold underline">View receipt</a> : null}</div></div>)}</div>
+        </section> : null}
         {newToken ? (
           <section className="mb-6 rounded-[1.5rem] border border-[#5b42d5]/25 bg-[#d9d3ff] p-6">
             <p className="font-black">Copy this key now. It will not be shown again.</p>

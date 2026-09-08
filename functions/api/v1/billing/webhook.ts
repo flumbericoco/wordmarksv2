@@ -64,6 +64,16 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     }
   }
 
+  if (event.type === 'invoice.payment_failed') {
+    const parent = object.parent as Record<string, unknown> | undefined;
+    const details = parent?.subscription_details as Record<string, unknown> | undefined;
+    const subscriptionId = String(object.subscription || details?.subscription || '');
+    if (subscriptionId) {
+      await env.DB.prepare("UPDATE subscriptions SET status='past_due', updated_at=datetime('now') WHERE stripe_subscription_id = ?")
+        .bind(subscriptionId).run();
+    }
+  }
+
   if (event.type === 'customer.subscription.deleted') {
     await env.DB.prepare("UPDATE subscriptions SET status='cancelled', updated_at=datetime('now') WHERE stripe_subscription_id = ?")
       .bind(String(object.id)).run();
