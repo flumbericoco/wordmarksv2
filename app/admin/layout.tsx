@@ -31,7 +31,6 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           </Link>
           <div className="flex items-center gap-4">
             <span className="hidden items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em] text-black/45 sm:flex"><span className="h-2 w-2 animate-pulse rounded-full bg-[#61c454]" /> System online</span>
-            <button onClick={logout} className="text-[10px] font-black uppercase tracking-[0.14em] text-black/45 hover:text-black">Sign out</button>
             <Link href="/" className="rounded-full bg-[#191916] px-4 py-2.5 text-xs font-bold text-white transition-transform hover:-translate-y-0.5">View website ↗</Link>
           </div>
         </div>
@@ -50,6 +49,10 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                 </Link>
               );
             })}
+            <button onClick={logout} className="group flex min-w-max items-center gap-3 rounded-2xl p-2.5 text-left text-red-700 transition-all hover:bg-red-50 lg:mt-3 lg:min-w-0">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-red-200 bg-red-50 font-mono text-[10px] font-bold">EX</span>
+              <span className="pr-3"><span className="block text-sm font-bold">Exit Admin</span><span className="hidden text-[10px] text-red-700/50 lg:block">End secure session</span></span>
+            </button>
           </nav>
           <div className="absolute bottom-7 left-5 right-5 hidden rounded-2xl bg-[#d9d3ff] p-4 lg:block">
             <p className="text-xs font-black">Need a fresh mark?</p>
