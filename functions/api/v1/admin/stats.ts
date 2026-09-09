@@ -7,6 +7,10 @@ interface Env {
   DB: D1Database;
   WORDMARKS_KV: KVNamespace;
   WORDMARKS_MCP_TOKEN?: string;
+  OPENAI_API_KEY?: string;
+  STRIPE_SECRET_KEY?: string;
+  STRIPE_WEBHOOK_SECRET?: string;
+  RESEND_API_KEY?: string;
 }
 
 interface FunctionContext {
@@ -66,6 +70,12 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         total: kbCount?.count || 0,
       },
       recentJobs: recentJobs.results || [],
+      services: {
+        database: 'up',
+        ai: env.OPENAI_API_KEY ? 'configured' : 'missing',
+        stripe: env.STRIPE_SECRET_KEY && env.STRIPE_WEBHOOK_SECRET ? 'configured' : 'missing',
+        email: env.RESEND_API_KEY ? 'configured' : 'missing',
+      },
     }, requestId);
   } catch (err) {
     return errorResponse(err, requestId);

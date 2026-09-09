@@ -145,8 +145,8 @@ export default function SettingsPage() {
               />
             </div>
             <div>
-              <p className="text-sm text-white">Auto-approve quality</p>
-              <p className="text-xs text-zinc-500">Skip manual approval when score is 9+</p>
+              <p className="text-sm text-white">Auto-review quality</p>
+              <p className="text-xs text-zinc-500">Run the quality review automatically after every successful generation</p>
             </div>
           </label>
 
@@ -165,7 +165,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <p className="text-sm text-white">Knowledge Base</p>
-              <p className="text-xs text-zinc-500">Include reference images in generation prompts</p>
+              <p className="text-xs text-zinc-500">Include curated reference descriptions and tags in generation prompts</p>
             </div>
           </label>
         </div>

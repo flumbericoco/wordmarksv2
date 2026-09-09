@@ -103,6 +103,7 @@ export default function StepInput({ brandName, description, onNext }: StepInputP
             nextDisabled={!cleanName}
             canGoBack={false}
           />
+          {(name || desc) ? <button type="button" onClick={() => { setName(''); setDesc(''); localStorage.removeItem('wordmarks:draft'); }} className="mt-3 self-end text-xs text-white/40 underline underline-offset-4 hover:text-white">Clear saved draft</button> : null}
         </div>
       </div>
     </div>

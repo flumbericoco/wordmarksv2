@@ -44,6 +44,7 @@ export default function AccountPage() {
     return '';
   });
   const [busy, setBusy] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -151,6 +152,22 @@ export default function AccountPage() {
     catch(error){setMessage(error instanceof Error?error.message:'Top-up unavailable');setBusy(false);}
   }
 
+  async function deleteAccount() {
+    if (!deletePassword || !window.confirm('Permanently delete this account, its API keys, credits, and logo history?')) return;
+    setBusy(true); setMessage('');
+    try {
+      await api('account/delete-account', { method: 'POST', body: JSON.stringify({ password: deletePassword }) });
+      window.location.assign('/');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Unable to delete account'); setBusy(false); }
+  }
+
+  async function rateGeneration(generationId: string, rating: number) {
+    try {
+      await api('account/generation-feedback', { method: 'POST', body: JSON.stringify({ generationId, rating }) });
+      setMessage('Thanks — your logo rating was recorded.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Unable to save rating'); }
+  }
+
   if (!user) {
     return (
       <main className="grid min-h-screen place-items-center bg-[#d9d3ff] px-5 py-16 text-[#171714]">
@@ -177,7 +194,7 @@ export default function AccountPage() {
         <header className="flex flex-wrap items-center justify-between gap-4 border-b border-black/10 pb-6">
           <Link href="/" className="text-2xl font-black tracking-[-0.06em]">wordmarks<span className="text-[#ff5c35]">.</span></Link>
           <div className="flex items-center gap-4 text-right">
-            <div><p className="text-sm font-bold">{user.email}</p><p className="text-xs text-black/45">{user.plan} plan</p></div>
+            <div><p className="text-sm font-bold">{user.email}</p><p className="text-xs text-black/45">{user.plan === 'none' ? 'Free beta' : `${user.plan} plan`}</p></div>
             <button onClick={logout} className="rounded-full border border-black/15 px-4 py-2 text-xs font-bold">Sign out</button>
           </div>
         </header>
@@ -198,11 +215,11 @@ export default function AccountPage() {
                 </button>
               ))}
             </div>
-            <p className="mt-4 text-xs text-black/45">Every plan includes the unchanged $25 initial pack with 25 credits.</p>
+            <p className="mt-4 text-xs leading-5 text-black/55"><strong>$25 is charged today</strong> for 25 credits. Your selected monthly plan starts after the 30-day introductory period, then renews monthly until cancelled.</p>
           </div>
         </section>
 
-        {message ? <p role="status" className={`mb-5 rounded-xl p-4 text-sm ${message.startsWith('Payment received')?'bg-green-100 text-green-800':message.startsWith('Checkout cancelled')?'bg-amber-100 text-amber-800':'bg-red-100 text-red-800'}`}>{message}</p> : null}
+        {message ? <div role="status" className={`mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl p-4 text-sm ${message.startsWith('Payment received')?'bg-green-100 text-green-800':message.startsWith('Checkout cancelled')?'bg-amber-100 text-amber-800':'bg-red-100 text-red-800'}`}><span>{message}</span>{message.startsWith('Payment received')?<button onClick={() => void load()} className="font-bold underline">Check payment status</button>:null}</div> : null}
         <section className="mb-6 grid gap-5 md:grid-cols-2">
           <div className="rounded-[2rem] border border-black/10 bg-white/60 p-7">
             <div className="flex items-start justify-between gap-4">
@@ -227,7 +244,7 @@ export default function AccountPage() {
         </section> : null}
         <section className="mb-6 rounded-[2rem] border border-black/10 bg-white/60 p-7">
           <p className="text-xs font-black uppercase tracking-[0.18em] text-[#5b42d5]">Logo history</p>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{generations.length===0?<p className="text-sm text-black/45">No saved logos yet.</p>:generations.map((item)=><article key={item.id} className="rounded-2xl border border-black/10 bg-white p-4">{item.result_url?<img src={item.result_url} alt={`${item.brand_name} logo`} className="aspect-square w-full rounded-xl bg-neutral-100 object-contain"/>:<div className="grid aspect-square place-items-center rounded-xl bg-neutral-100 text-sm text-black/45">{item.status}</div>}<div className="mt-3 flex items-center justify-between gap-3"><div><strong>{item.brand_name}</strong><p className="text-xs text-black/40">{new Date(`${item.created_at}Z`).toLocaleString()}</p></div>{item.result_url?<a href={item.result_url} download={`${item.brand_name}-logo.svg`} className="text-xs font-bold underline">Download</a>:null}</div></article>)}</div>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{generations.length===0?<p className="text-sm text-black/45">No saved logos yet.</p>:generations.map((item)=><article key={item.id} className="rounded-2xl border border-black/10 bg-white p-4">{item.result_url?<img src={item.result_url} alt={`${item.brand_name} logo`} className="aspect-square w-full rounded-xl bg-neutral-100 object-contain"/>:<div className="grid aspect-square place-items-center rounded-xl bg-neutral-100 text-sm text-black/45">{item.status}</div>}<div className="mt-3 flex items-center justify-between gap-3"><div><strong>{item.brand_name}</strong><p className="text-xs text-black/40">{new Date(`${item.created_at}Z`).toLocaleString()}</p></div>{item.result_url?<a href={item.result_url} download={`${item.brand_name}-logo.svg`} className="text-xs font-bold underline">Download</a>:null}</div>{item.status==='completed'?<div className="mt-3 flex items-center gap-1 border-t border-black/10 pt-3"><span className="mr-2 text-[11px] text-black/40">Rate</span>{[1,2,3,4,5].map((rating)=><button key={rating} onClick={() => void rateGeneration(item.id,rating)} aria-label={`Rate ${rating} out of 5`} className="text-lg text-amber-500">★</button>)}</div>:null}</article>)}</div>
         </section>
         {newToken ? (
           <section className="mb-6 rounded-[1.5rem] border border-[#5b42d5]/25 bg-[#d9d3ff] p-6">
@@ -245,6 +262,12 @@ export default function AccountPage() {
             ))}
           </div>
           <div className="mt-6 rounded-2xl bg-[#171714] p-5 text-xs leading-6 text-white/65"><code>Authorization: Bearer wm_live_your_key</code><br /><code>https://wordmarks-v2-dz1.pages.dev/mcp</code></div>
+        </section>
+        <section className="mt-6 rounded-[2rem] border border-red-200 bg-red-50 p-7">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-red-700">Danger zone</p>
+          <h2 className="mt-2 text-2xl font-black">Delete account</h2>
+          <p className="mt-2 text-sm text-red-900/60">This permanently removes your account data. Active subscriptions must be cancelled first.</p>
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row"><input type="password" value={deletePassword} onChange={(event) => setDeletePassword(event.target.value)} placeholder="Confirm your password" className="rounded-xl border border-red-200 bg-white px-4 py-3 text-sm"/><button disabled={busy || !deletePassword} onClick={deleteAccount} className="rounded-full bg-red-700 px-5 py-3 text-xs font-black uppercase text-white disabled:opacity-50">Delete permanently</button></div>
         </section>
       </div>
     </main>

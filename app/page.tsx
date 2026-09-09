@@ -39,6 +39,23 @@ export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isReviewing, setIsReviewing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [account, setAccount] = useState<{ email: string; credits: number } | null>(null);
+  const [maxIterations, setMaxIterations] = useState(3);
+  const [autoReview, setAutoReview] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void fetch('/api/v1/account/me', { credentials: 'same-origin' })
+        .then(async (response) => response.ok ? response.json() as Promise<{ user?: { email: string; credits: number } }> : null)
+        .then((payload) => setAccount(payload?.user || null))
+        .catch(() => setAccount(null));
+      void fetch('/api/v1/studio-config')
+        .then((response) => response.json() as Promise<{ data?: { maxIterations?: number; autoReview?: boolean } }>)
+        .then((payload) => { setMaxIterations(payload?.data?.maxIterations || 3); setAutoReview(Boolean(payload?.data?.autoReview)); })
+        .catch(() => undefined);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const rememberResult = (
     data: WizardData,
@@ -112,6 +129,10 @@ export default function Home() {
       setLogo(result);
       setCurrentPrompt(result.revisedPrompt);
       rememberResult(data, researchText, result, 0);
+      if (autoReview) {
+        const review = await reviewLogo(result.revisedPrompt, data.brandName).catch(() => null);
+        if (review) setQualityReview(review);
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Generation failed');
     } finally {
@@ -130,6 +151,10 @@ export default function Home() {
       setCurrentPrompt(result.revisedPrompt);
       setQualityReview(null);
       rememberResult(wizardData, research, result, iteration);
+      if (autoReview) {
+        const review = await reviewLogo(result.revisedPrompt, wizardData.brandName).catch(() => null);
+        if (review) setQualityReview(review);
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Regeneration failed');
     } finally {
@@ -153,6 +178,7 @@ export default function Home() {
 
   const handleIterate = async () => {
     if (!qualityReview || !logo || !wizardData) return;
+    if (iteration >= maxIterations) return setError(`Maximum of ${maxIterations} revisions reached for this logo.`);
     if (!window.confirm('Creating this revision uses 1 credit. Continue?')) return;
     setIsGenerating(true);
     setError(null);
@@ -170,6 +196,10 @@ export default function Home() {
       const nextIteration = iteration + 1;
       setIteration(nextIteration);
       rememberResult(wizardData, research, result, nextIteration);
+      if (autoReview) {
+        const review = await reviewLogo(result.revisedPrompt, wizardData.brandName).catch(() => null);
+        if (review) setQualityReview(review);
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Iteration failed');
     } finally {
@@ -221,6 +251,7 @@ export default function Home() {
             <a href="/developers" className="hidden text-xs font-semibold uppercase tracking-[0.16em] transition-opacity hover:opacity-50 md:block">Developers</a>
             <a href="#pricing" className="hidden text-xs font-semibold uppercase tracking-[0.16em] transition-opacity hover:opacity-50 lg:block">Pricing</a>
             <a href="/admin" className="hidden text-xs font-semibold uppercase tracking-[0.16em] transition-opacity hover:opacity-50 sm:block">Admin</a>
+            <a href="/account" className="hidden rounded-full border border-black/15 px-4 py-2 text-xs font-bold sm:block">{account ? `${account.credits} credits` : 'Sign in'}</a>
             <a href="#create" className="rounded-full bg-[#171714] px-5 py-2.5 text-xs font-bold uppercase tracking-[0.12em] text-white transition-transform hover:-translate-y-0.5">Create yours</a>
           </nav>
         </div>
@@ -249,6 +280,7 @@ export default function Home() {
                   </a>
                   <span className="text-xs font-semibold uppercase tracking-[0.14em] text-black/45">No design skills needed</span>
                 </div>
+                <p className="mt-4 text-xs text-black/45">Create an account and receive 10 beta credits. One successful logo generation uses one credit.</p>
               </div>
 
               <div className="relative mx-auto aspect-square w-full max-w-[380px] lg:justify-self-end">

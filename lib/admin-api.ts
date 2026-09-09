@@ -142,6 +142,7 @@ export async function deleteKBItem(id: string): Promise<{ deleted: boolean }> {
 // ─── Stats API ──────────────────────────────────────────
 
 export interface AdminStats {
+  services?: { database: string; ai: string; stripe: string; email: string };
   providers: {
     total: number;
     active: { name: string; textModel: string; imageModel: string } | null;

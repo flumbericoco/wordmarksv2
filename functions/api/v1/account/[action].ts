@@ -142,5 +142,32 @@ export const onRequest: PagesFunction<Env> = async ({ request, env, params }) =>
     return json({ ok: true, generations: rows.results || [] });
   }
 
+  if (action === 'delete-account' && request.method === 'POST') {
+    const body = await bodyOf(request);
+    const password = String(body.password || '');
+    const stored = await env.DB.prepare('SELECT password_hash,password_salt FROM users WHERE id=?')
+      .bind(user.id).first<{ password_hash: string; password_salt: string }>();
+    if (!stored || await hashPassword(password, stored.password_salt) !== stored.password_hash) {
+      return json({ error: 'Password is incorrect' }, 403);
+    }
+    const active = await env.DB.prepare("SELECT id FROM subscriptions WHERE user_id=? AND status IN ('active','trialing','past_due') LIMIT 1")
+      .bind(user.id).first();
+    if (active) return json({ error: 'Cancel the active subscription in Billing before deleting your account.' }, 409);
+    await env.DB.prepare('DELETE FROM users WHERE id=?').bind(user.id).run();
+    return json({ ok: true }, 200, { 'Set-Cookie': sessionCookie('', 0) });
+  }
+
+  if (action === 'generation-feedback' && request.method === 'POST') {
+    const body = await bodyOf(request);
+    const generationId = String(body.generationId || '');
+    const rating = Number(body.rating);
+    if (!generationId || ![1, 2, 3, 4, 5].includes(rating)) return json({ error: 'A rating from 1 to 5 is required' }, 400);
+    const owned = await env.DB.prepare('SELECT id FROM generation_jobs WHERE id=? AND user_id=?').bind(generationId, user.id).first();
+    if (!owned) return json({ error: 'Logo not found' }, 404);
+    await env.DB.prepare("INSERT INTO audit_events(id,event_type,actor,action,resource_type,resource_id,details) VALUES (?,'feedback',?,'rate_generation','generation',?,?)")
+      .bind(crypto.randomUUID(), `user:${user.id}`, generationId, JSON.stringify({ rating })).run();
+    return json({ ok: true });
+  }
+
   return json({ error: 'Not found' }, 404);
 };

@@ -85,6 +85,22 @@ export default function DevelopersPage() {
         </div>
       </section>
 
+      <section className="px-5 py-16 sm:px-8 lg:py-24">
+        <div className="mx-auto max-w-7xl">
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-[#5b42d5]">Client setup</p>
+          <h2 className="mt-3 text-4xl font-black tracking-[-0.055em]">One endpoint, your preferred agent.</h2>
+          <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-3">{[
+            ['Codex CLI', 'Add a Streamable HTTP MCP server, use the URL above, then set the Authorization header.'],
+            ['Kilo Code', 'Settings → Agent Behaviour → MCP Servers → add a remote server with URL and Bearer header.'],
+            ['Zcode', 'Open MCP settings and add the remote endpoint. If remote HTTP is unavailable, use the local bridge config.'],
+            ['Claude Code', 'Run: claude mcp add --transport http wordmarks <URL> --header "Authorization: Bearer <TOKEN>"'],
+            ['Cursor', 'Add the local mcp-remote bridge to .cursor/mcp.json, then restart Cursor.'],
+            ['Generic client', 'Use Streamable HTTP POST, MCP protocol 2025-06-18, and Authorization: Bearer wm_live_...'],
+          ].map(([name, text]) => <article key={name} className="rounded-2xl border border-black/10 bg-white/60 p-5"><h3 className="font-black">{name}</h3><p className="mt-2 text-sm leading-6 text-black/55">{text}</p></article>)}</div>
+          <div className="mt-6 rounded-2xl border border-black/10 bg-white/60 p-5 text-sm leading-6 text-black/60"><strong>Usage:</strong> one successful logo costs one credit. Failed generation attempts are refunded. Rate-limit headers are returned with every HTTP response; if limited, wait for <code>Retry-After</code> before retrying.</div>
+        </div>
+      </section>
+
       <footer className="bg-[#171714] px-5 py-7 text-white sm:px-8">
         <div className="mx-auto flex max-w-7xl items-center justify-between text-xs text-white/40">
           <span>Wordmarks Developer Platform</span>

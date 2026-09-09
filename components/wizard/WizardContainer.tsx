@@ -25,6 +25,11 @@ export default function WizardContainer({ onComplete }: WizardContainerProps) {
   const [error, setError] = useState<string | null>(null);
 
   const handleInputComplete = async (name: string, desc: string) => {
+    const session = await fetch('/api/v1/account/me', { credentials: 'same-origin' });
+    if (!session.ok) {
+      window.location.assign('/account?next=%2F%23create');
+      return;
+    }
     setData((prev) => ({ ...prev, brandName: name, description: desc }));
     setStep('research');
     setIsResearching(true);

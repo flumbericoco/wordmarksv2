@@ -31,7 +31,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             <span className="rounded-full border border-black/15 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.16em]">Studio admin</span>
           </Link>
           <div className="flex items-center gap-4">
-            <span className="hidden items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em] text-black/45 sm:flex"><span className="h-2 w-2 animate-pulse rounded-full bg-[#61c454]" /> System online</span>
+            <span className="hidden items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em] text-black/45 sm:flex"><span className="h-2 w-2 rounded-full bg-[#e8a317]" /> Check service status</span>
             <Link href="/" className="rounded-full bg-[#191916] px-4 py-2.5 text-xs font-bold text-white transition-transform hover:-translate-y-0.5">View website ↗</Link>
           </div>
         </div>

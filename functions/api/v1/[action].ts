@@ -189,6 +189,8 @@ async function handleGenerate(
 
     const providerHost = new URL(provider.baseUrl).hostname;
     const useSvgGeneration = providerHost === 'api.pesatrouter.com' || !provider.imageModel;
+    const settingsRows = await db.prepare("SELECT key,value FROM settings WHERE key IN ('imageQuality','imageSize')").all<{ key: string; value: string }>();
+    const generationSettings = Object.fromEntries(settingsRows.results.map((row) => [row.key, row.value]));
     const result = useSvgGeneration
       ? await generateSvgWordmark(prompt, body.brandName, provider)
       : await generateImageServer(
@@ -196,7 +198,13 @@ async function handleGenerate(
           provider.apiKey,
           provider.baseUrl,
           provider.imageModel,
-          { timeoutMs: 60_000 },
+          {
+            timeoutMs: 60_000,
+            quality: generationSettings.imageQuality === 'standard' ? 'standard' : 'hd',
+            size: ['1024x1024', '1792x1024', '1024x1792'].includes(generationSettings.imageSize)
+              ? generationSettings.imageSize as '1024x1024' | '1792x1024' | '1024x1792'
+              : '1024x1024',
+          },
         );
 
     const duration = Date.now() - startTime;
@@ -376,7 +384,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
                 .bind(crypto.randomUUID(), user.id, 'generation_refund', `refund:${requestId}`),
             ]);
           }
-          throw error;
+          const message = error instanceof Error ? error.message : 'Generation failed';
+          throw new ProviderError(`${message}. Your credit was automatically refunded.`);
         }
         break;
       }

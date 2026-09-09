@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { QualityScore } from '@/lib/types';
 
 interface LogoResultViewProps {
@@ -44,6 +45,12 @@ export default function LogoResultView({
   onDownload,
   onNewLogo,
 }: LogoResultViewProps) {
+  const [previewBackground, setPreviewBackground] = useState<'light' | 'dark' | 'transparent'>('light');
+  const previewClass = previewBackground === 'dark'
+    ? 'bg-zinc-950'
+    : previewBackground === 'transparent'
+      ? 'bg-[linear-gradient(45deg,#ddd_25%,transparent_25%),linear-gradient(-45deg,#ddd_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#ddd_75%),linear-gradient(-45deg,transparent_75%,#ddd_75%)] bg-[length:20px_20px] bg-[position:0_0,0_10px,10px_-10px,-10px_0px]'
+      : 'bg-white';
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       {/* Logo Display */}
@@ -72,7 +79,7 @@ export default function LogoResultView({
             </button>
           </div>
         </div>
-        <div className="p-8">
+        <div className={`p-8 ${previewClass}`}>
           {isGenerating ? (
             <div className="flex flex-col items-center gap-4 py-16">
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
@@ -94,12 +101,17 @@ export default function LogoResultView({
 
       {/* Action Buttons */}
       {!isGenerating && (
-        <div className="flex justify-center gap-3">
+        <div className="flex flex-wrap justify-center gap-3">
+          <div className="flex rounded-lg border border-white/10 p-1">
+            {(['light', 'dark', 'transparent'] as const).map((background) => (
+              <button key={background} onClick={() => setPreviewBackground(background)} className={`rounded-md px-3 py-1.5 text-xs capitalize ${previewBackground === background ? 'bg-white text-black' : 'text-zinc-400'}`}>{background}</button>
+            ))}
+          </div>
           <button
             onClick={onRegenerate}
             className="rounded-lg border border-white/10 px-5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-white/5 hover:text-white transition-colors"
           >
-            ↻ Regenerate
+            ↻ Regenerate · 1 credit
           </button>
           {!qualityReview && (
             <button
@@ -133,7 +145,7 @@ export default function LogoResultView({
                 onClick={onIterate}
                 className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-500 transition-colors"
               >
-                ↻ Iterate & Improve
+                ↻ Iterate & Improve · 1 credit
               </button>
             )}
           </div>

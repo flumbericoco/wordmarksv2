@@ -95,6 +95,8 @@ export function parseJsonResponse<T>(raw: string): T {
 interface ProviderCallOptions {
   timeoutMs?: number;
   maxRetries?: number;
+  quality?: 'standard' | 'hd';
+  size?: '1024x1024' | '1792x1024' | '1024x1792';
 }
 
 async function sleep(ms: number): Promise<void> {
@@ -282,8 +284,8 @@ export async function generateImageServer(
           model: 'dall-e-3',
           prompt,
           n: 1,
-          size: '1024x1024',
-          quality: 'hd',
+          size: options?.size || '1024x1024',
+          quality: options?.quality || 'hd',
           response_format: 'url',
         }),
         signal: controller.signal,
