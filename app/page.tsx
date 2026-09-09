@@ -319,15 +319,15 @@ export default function Home() {
             <section id="process" data-reveal className="reveal-section mx-auto max-w-7xl px-5 py-12 sm:px-8 lg:py-14">
               <div className="grid gap-7 lg:grid-cols-[0.55fr_1.45fr] lg:items-center">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#ff5c35]">The process</p>
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#b4351b]">The process</p>
                   <h2 className="mt-3 max-w-md text-4xl font-black leading-[0.92] tracking-[-0.06em]">Three moves. One iconic mark.</h2>
                 </div>
                 <div className="divide-y divide-black/15 border-y border-black/15">
                   {steps.map(([number, title, description]) => (
                     <div key={number} className="group grid gap-2 py-4 sm:grid-cols-[48px_0.9fr_1.1fr] sm:items-center">
-                      <span className="font-mono text-xs text-black/35">{number}</span>
+                      <span className="font-mono text-xs text-black/70">{number}</span>
                       <h3 className="text-xl font-bold tracking-[-0.03em] transition-transform group-hover:translate-x-2">{title}</h3>
-                      <p className="text-sm leading-6 text-black/50">{description}</p>
+                      <p className="text-sm leading-6 text-black/70">{description}</p>
                     </div>
                   ))}
                 </div>
