@@ -12,22 +12,22 @@ interface StepInputProps {
 export default function StepInput({ brandName, description, onNext }: StepInputProps) {
   const [name, setName] = useState(brandName);
   const [desc, setDesc] = useState(description);
+  const [draftLoaded, setDraftLoaded] = useState(false);
   const cleanName = name.trim();
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      try {
-        const saved = JSON.parse(localStorage.getItem('wordmarks:draft') || '{}') as { name?: string; description?: string };
-        if (!brandName && saved.name) setName(saved.name);
-        if (!description && saved.description) setDesc(saved.description);
-      } catch { /* Ignore malformed browser storage. */ }
-    }, 0);
-    return () => window.clearTimeout(timer);
+    try {
+      const saved = JSON.parse(localStorage.getItem('wordmarks:draft') || '{}') as { name?: string; description?: string };
+      if (!brandName && saved.name) setName(saved.name);
+      if (!description && saved.description) setDesc(saved.description);
+    } catch { /* Ignore malformed browser storage. */ }
+    setDraftLoaded(true);
   }, [brandName, description]);
 
   useEffect(() => {
+    if (!draftLoaded) return;
     localStorage.setItem('wordmarks:draft', JSON.stringify({ name, description: desc }));
-  }, [name, desc]);
+  }, [name, desc, draftLoaded]);
 
   return (
     <div className="wizard-enter">
