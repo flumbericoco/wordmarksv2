@@ -157,6 +157,7 @@ export default function ProvidersPage() {
             <label className="text-xs text-zinc-400">Text model<input value={form.textModel || ''} onChange={(e) => setForm({ ...form, textModel: e.target.value })} className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white" /></label>
             <label className="text-xs text-zinc-400">Image model (optional)<input value={form.imageModel || ''} onChange={(e) => setForm({ ...form, imageModel: e.target.value })} className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white" /></label>
           </div>
+          <div className="rounded-lg border border-white/10 bg-black/20 px-4 py-3 text-xs leading-5 text-zinc-400">This provider uses the server-side <code>OPENAI_API_KEY</code> Cloudflare secret. Provider keys are never entered or exposed in this page.</div>
           <label className="flex items-center gap-2 text-xs text-zinc-300"><input type="checkbox" checked={Boolean(form.isActive)} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} /> Make active after saving</label>
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={handleTest} disabled={testing || !form.baseUrl || !form.textModel} className="rounded-lg border border-blue-500/40 px-4 py-2 text-sm font-semibold text-blue-300 disabled:opacity-50">{testing ? 'Testing...' : 'Test connection'}</button>
@@ -290,7 +291,7 @@ export default function ProvidersPage() {
           {providers.length === 0 && (
             <div className="rounded-xl border border-white/10 bg-white/5 p-8 text-center">
               <p className="text-sm text-zinc-500">No API providers configured yet.</p>
-              <p className="mt-1 text-xs text-zinc-600">Click one of the preset buttons above to get started.</p>
+              <p className="mt-1 text-xs leading-5 text-zinc-600">The built-in environment provider may still power generation when <code>OPENAI_API_KEY</code> is configured. Add a provider here only to override its URL or models.</p>
             </div>
           )}
         </div>

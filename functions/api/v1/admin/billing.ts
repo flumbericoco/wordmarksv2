@@ -25,16 +25,16 @@ export const onRequest: PagesFunction<Env> = async ({ request, env }) => {
         throw new ValidationError('userId, non-zero integer amount, and note are required');
       }
       const reference = `admin-adjustment:${crypto.randomUUID()}`;
-      const result = await env.DB.prepare(
-        "UPDATE users SET credits=credits+?,updated_at=datetime('now') WHERE id=? AND credits+?>=0"
-      ).bind(amount, userId, amount).run();
-      if (!result.meta.changes) throw new ValidationError('User not found or adjustment would create a negative balance');
-      await env.DB.batch([
-        env.DB.prepare("INSERT INTO credit_ledger(id,user_id,amount,reason,reference) VALUES (?,?,?,'admin_adjustment',?)")
-          .bind(crypto.randomUUID(), userId, amount, reference),
-        env.DB.prepare("INSERT INTO audit_events(id,event_type,actor,action,resource_type,resource_id,details) VALUES (?,'admin',?,'adjust_credits','user',?,?)")
-          .bind(crypto.randomUUID(), auth.actor, userId, JSON.stringify({ amount, note, reference })),
+      const results = await env.DB.batch([
+        env.DB.prepare(
+          "UPDATE users SET credits=credits+?,updated_at=datetime('now') WHERE id=? AND credits+?>=0"
+        ).bind(amount, userId, amount),
+        env.DB.prepare("INSERT INTO credit_ledger(id,user_id,amount,reason,reference) SELECT ?,?,?,'admin_adjustment',? WHERE EXISTS (SELECT 1 FROM users WHERE id=?)")
+          .bind(crypto.randomUUID(), userId, amount, reference, userId),
+        env.DB.prepare("INSERT INTO audit_events(id,event_type,actor,action,resource_type,resource_id,details) SELECT ?,'admin',?,'adjust_credits','user',?,? WHERE EXISTS (SELECT 1 FROM users WHERE id=?)")
+          .bind(crypto.randomUUID(), auth.actor, userId, JSON.stringify({ amount, note, reference }), userId),
       ]);
+      if (!results[0].meta.changes) throw new ValidationError('User not found or adjustment would create a negative balance');
       return successResponse({ adjusted: true, reference }, requestId);
     }
     throw new ValidationError('Method not allowed');

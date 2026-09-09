@@ -158,9 +158,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const metadata = object.metadata as Record<string, string> | undefined;
     const status = String(object.status || 'unknown');
     const plan = metadata?.plan;
+    const items = object.items as { data?: Array<Record<string, unknown>> } | undefined;
+    const periodEnd = object.current_period_end || items?.data?.[0]?.current_period_end || object.cancel_at;
     await env.DB.prepare(
       "UPDATE subscriptions SET status=?, current_period_end=?, updated_at=datetime('now') WHERE stripe_subscription_id=?"
-    ).bind(status, object.current_period_end ? new Date(Number(object.current_period_end) * 1000).toISOString() : null, String(object.id)).run();
+    ).bind(status, periodEnd ? new Date(Number(periodEnd) * 1000).toISOString() : null, String(object.id)).run();
     if (plan && ['active', 'trialing'].includes(status)) {
       await env.DB.prepare("UPDATE users SET plan=?, updated_at=datetime('now') WHERE id=(SELECT user_id FROM subscriptions WHERE stripe_subscription_id=?)")
         .bind(plan, String(object.id)).run();

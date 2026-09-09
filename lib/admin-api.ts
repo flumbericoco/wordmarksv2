@@ -173,6 +173,15 @@ export async function getStats(): Promise<AdminStats> {
   return adminCall<AdminStats>('stats');
 }
 
+export interface AdminHealth {
+  checkedAt: string;
+  checks: Record<string, { status: 'up' | 'down' | 'missing'; latencyMs?: number; detail?: string }>;
+}
+
+export async function runHealthChecks(): Promise<AdminHealth> {
+  return adminCall<AdminHealth>('health');
+}
+
 // ─── Export API ──────────────────────────────────────────
 
 export async function exportData(): Promise<Blob> {

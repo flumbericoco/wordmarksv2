@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import StepNavigation from './StepNavigation';
 
 interface StepInputProps {
@@ -12,22 +12,25 @@ interface StepInputProps {
 export default function StepInput({ brandName, description, onNext }: StepInputProps) {
   const [name, setName] = useState(brandName);
   const [desc, setDesc] = useState(description);
-  const [draftLoaded, setDraftLoaded] = useState(false);
+  const draftLoaded = useRef(false);
   const cleanName = name.trim();
 
   useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem('wordmarks:draft') || '{}') as { name?: string; description?: string };
-      if (!brandName && saved.name) setName(saved.name);
-      if (!description && saved.description) setDesc(saved.description);
-    } catch { /* Ignore malformed browser storage. */ }
-    setDraftLoaded(true);
+    const timer = window.setTimeout(() => {
+      try {
+        const saved = JSON.parse(localStorage.getItem('wordmarks:draft') || '{}') as { name?: string; description?: string };
+        if (!brandName && saved.name) setName(saved.name);
+        if (!description && saved.description) setDesc(saved.description);
+      } catch { /* Ignore malformed browser storage. */ }
+      draftLoaded.current = true;
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [brandName, description]);
 
   useEffect(() => {
-    if (!draftLoaded) return;
+    if (!draftLoaded.current) return;
     localStorage.setItem('wordmarks:draft', JSON.stringify({ name, description: desc }));
-  }, [name, desc, draftLoaded]);
+  }, [name, desc]);
 
   return (
     <div className="wizard-enter">

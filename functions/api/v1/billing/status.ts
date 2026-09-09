@@ -30,12 +30,13 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   if (env.STRIPE_SECRET_KEY && subscription?.id) {
     const remote = await stripeGet(`subscriptions/${encodeURIComponent(subscription.id)}`, env.STRIPE_SECRET_KEY);
     if (remote) {
-      const periodEnd = Number(remote.current_period_end || 0);
+      const items = remote.items as { data?: Array<Record<string, unknown>> } | undefined;
+      const periodEnd = Number(remote.current_period_end || items?.data?.[0]?.current_period_end || remote.cancel_at || 0);
       subscription = {
         ...subscription,
         status: String(remote.status || subscription.status),
         currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000).toISOString() : subscription.currentPeriodEnd,
-        cancelAtPeriodEnd: Boolean(remote.cancel_at_period_end),
+        cancelAtPeriodEnd: Boolean(remote.cancel_at_period_end || remote.cancel_at),
       };
     }
   }
