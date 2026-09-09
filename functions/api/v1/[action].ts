@@ -366,7 +366,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           }
         }
         try {
-          data = await handleGenerate(validated.data, provider, env.DB, env.GENERATED_BUCKET, requestId, waitUntil, user?.id);
+          const ownerId = user?.id || (internalMcpCall ? request.headers.get('X-Wordmarks-User-ID') || undefined : undefined);
+          data = await handleGenerate(validated.data, provider, env.DB, env.GENERATED_BUCKET, requestId, waitUntil, ownerId);
         } catch (error) {
           if (user && reserved) {
             await env.DB.batch([

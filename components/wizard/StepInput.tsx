@@ -15,11 +15,14 @@ export default function StepInput({ brandName, description, onNext }: StepInputP
   const cleanName = name.trim();
 
   useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem('wordmarks:draft') || '{}') as { name?: string; description?: string };
-      if (!brandName && saved.name) setName(saved.name);
-      if (!description && saved.description) setDesc(saved.description);
-    } catch { /* Ignore malformed browser storage. */ }
+    const timer = window.setTimeout(() => {
+      try {
+        const saved = JSON.parse(localStorage.getItem('wordmarks:draft') || '{}') as { name?: string; description?: string };
+        if (!brandName && saved.name) setName(saved.name);
+        if (!description && saved.description) setDesc(saved.description);
+      } catch { /* Ignore malformed browser storage. */ }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [brandName, description]);
 
   useEffect(() => {

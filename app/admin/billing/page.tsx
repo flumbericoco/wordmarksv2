@@ -21,9 +21,14 @@ export default function AdminBillingPage() {
     if (!response.ok) throw new Error(payload.error || 'Unable to load billing data');
     setData(payload.data!);
   }
-  useEffect(() => { void load().catch((error) => setMessage(error.message)); }, []);
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load().catch((error) => setMessage(error.message)), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
   async function adjust(event: FormEvent) {
     event.preventDefault(); setMessage('');
+    const selected = data.users.find((user) => user.id === userId);
+    if (!window.confirm(`Adjust ${selected?.email || 'this user'} by ${Number(amount) > 0 ? '+' : ''}${amount} credits?\nReason: ${note}`)) return;
     const response = await fetch('/api/v1/admin/billing', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId, amount: Number(amount), note }) });
     const payload = await response.json() as { error?: string };
     if (!response.ok) return setMessage(payload.error || 'Adjustment failed');

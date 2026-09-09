@@ -43,8 +43,11 @@ async function apiCall<T>(
   }
 
   if (!data.ok) {
-    // Use server-provided error message (already sanitized)
-    throw new Error(data.error || `Request failed (${res.status})`);
+    const retryAfter = res.headers.get('Retry-After');
+    const suffix = res.status === 429 && retryAfter
+      ? ` Try again in ${retryAfter} seconds.`
+      : '';
+    throw new Error(`${data.error || `Request failed (${res.status})`}${suffix}`);
   }
 
   return data.data as T;

@@ -9,6 +9,7 @@ interface Subscription { id: string; plan: string; status: string; currentPeriod
 interface Invoice { id: string; number: string; status: string; amountPaid: number; currency: string; createdAt: string; hostedUrl: string | null }
 interface CreditEntry { id: string; amount: number; reason: string; created_at: string }
 interface BillingData { subscription: Subscription | null; invoices: Invoice[]; creditHistory: CreditEntry[] }
+interface Generation { id:string; brand_name:string; status:string; model:string; result_url?:string; error?:string; created_at:string }
 
 class ApiRequestError extends Error {
   constructor(message: string, readonly status: number) { super(message); }
@@ -33,6 +34,8 @@ export default function AccountPage() {
   const [password, setPassword] = useState('');
   const [newToken, setNewToken] = useState('');
   const [billing, setBilling] = useState<BillingData>({ subscription: null, invoices: [], creditHistory: [] });
+  const [generations, setGenerations] = useState<Generation[]>([]);
+  const [requestedPlan] = useState(() => typeof window === 'undefined' ? '' : new URLSearchParams(window.location.search).get('plan') || '');
   const [message, setMessage] = useState(() => {
     if (typeof window === 'undefined') return '';
     const checkoutState = new URLSearchParams(window.location.search).get('checkout');
@@ -58,6 +61,10 @@ export default function AccountPage() {
       } catch (reason) {
         if (reason instanceof ApiRequestError && reason.status === 401) setUser(null);
       }
+      try {
+        const history = await api<{ generations: Generation[] }>('account/generations');
+        setGenerations(history.generations);
+      } catch { /* Keep account usable if history is temporarily unavailable. */ }
     } catch (reason) {
       if (reason instanceof ApiRequestError && reason.status === 401) setUser(null);
     }
@@ -65,10 +72,18 @@ export default function AccountPage() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
+    const awaitingPayment = new URLSearchParams(window.location.search).get('checkout') === 'success';
+    let attempts = 0;
+    const paymentPoller = awaitingPayment ? window.setInterval(() => {
+      attempts += 1;
+      void load();
+      if (attempts >= 10) window.clearInterval(paymentPoller);
+    }, 3000) : undefined;
     const refreshOnFocus = () => void load();
     window.addEventListener('focus', refreshOnFocus);
     return () => {
       window.clearTimeout(timer);
+      if (paymentPoller) window.clearInterval(paymentPoller);
       window.removeEventListener('focus', refreshOnFocus);
     };
   }, [load]);
@@ -102,6 +117,7 @@ export default function AccountPage() {
   }
 
   async function revokeKey(id: string) {
+    if (!window.confirm('Revoke this API key? Connected agents using it will stop working.')) return;
     await api('account/revoke-key', { method: 'POST', body: JSON.stringify({ id }) });
     await load();
   }
@@ -127,6 +143,12 @@ export default function AccountPage() {
       const result = await api<{ url: string }>('billing/portal', { method: 'POST' });
       window.location.assign(result.url);
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Billing portal unavailable'); setBusy(false); }
+  }
+
+  async function topup() {
+    setBusy(true); setMessage('');
+    try { const result = await api<{url:string}>('billing/topup',{method:'POST'}); window.location.assign(result.url); }
+    catch(error){setMessage(error instanceof Error?error.message:'Top-up unavailable');setBusy(false);}
   }
 
   if (!user) {
@@ -165,12 +187,13 @@ export default function AccountPage() {
             <p className="text-xs font-black uppercase tracking-[0.18em] text-[#c6ff4a]">Available credits</p>
             <p className="mt-5 text-7xl font-black tracking-[-0.08em]">{user.credits}</p>
             <p className="mt-3 text-sm text-white/45">One credit generates one logo. Unused credits never expire.</p>
+            <button disabled={busy} onClick={topup} className="mt-5 rounded-full bg-[#c6ff4a] px-5 py-3 text-xs font-black uppercase text-black disabled:opacity-50">Top up 25 credits · $25</button>
           </div>
           <div className="rounded-[2rem] border border-black/10 bg-white/60 p-7">
             <p className="text-xs font-black uppercase tracking-[0.18em] text-[#5b42d5]">Choose your monthly credits</p>
             <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
               {[['lite', '$1', '1'], ['growth', '$3', '4'], ['pro', '$7', '10'], ['scale', '$17', '28']].map(([plan, price, credits]) => (
-                <button key={plan} disabled={busy} onClick={() => checkout(plan)} className="rounded-2xl border border-black/10 bg-white p-4 text-left transition-transform hover:-translate-y-1 disabled:opacity-50">
+                <button key={plan} disabled={busy} onClick={() => checkout(plan)} className={`rounded-2xl border bg-white p-4 text-left transition-transform hover:-translate-y-1 disabled:opacity-50 ${requestedPlan===plan?'border-[#5b42d5] ring-4 ring-[#5b42d5]/10':'border-black/10'}`}>
                   <span className="text-xs font-black uppercase">{plan}</span><strong className="mt-4 block text-2xl">{price}<small className="text-xs font-normal text-black/40">/mo</small></strong><span className="mt-1 block text-xs text-black/45">{credits} credits/month</span>
                 </button>
               ))}
@@ -179,7 +202,7 @@ export default function AccountPage() {
           </div>
         </section>
 
-        {message ? <p role="alert" className="mb-5 rounded-xl bg-red-100 p-4 text-sm text-red-800">{message}</p> : null}
+        {message ? <p role="status" className={`mb-5 rounded-xl p-4 text-sm ${message.startsWith('Payment received')?'bg-green-100 text-green-800':message.startsWith('Checkout cancelled')?'bg-amber-100 text-amber-800':'bg-red-100 text-red-800'}`}>{message}</p> : null}
         <section className="mb-6 grid gap-5 md:grid-cols-2">
           <div className="rounded-[2rem] border border-black/10 bg-white/60 p-7">
             <div className="flex items-start justify-between gap-4">
@@ -202,6 +225,10 @@ export default function AccountPage() {
           <p className="text-xs font-black uppercase tracking-[0.18em] text-[#5b42d5]">Payment history</p>
           <div className="mt-4 divide-y divide-black/10">{billing.invoices.map((invoice) => <div key={invoice.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm"><div><p className="font-bold">{invoice.number || 'Stripe invoice'}</p><p className="text-xs text-black/45">{new Date(invoice.createdAt).toLocaleDateString()} · {invoice.status}</p></div><div className="flex items-center gap-4"><strong>{invoice.currency} {(invoice.amountPaid / 100).toFixed(2)}</strong>{invoice.hostedUrl ? <a href={invoice.hostedUrl} target="_blank" rel="noreferrer" className="text-xs font-bold underline">View receipt</a> : null}</div></div>)}</div>
         </section> : null}
+        <section className="mb-6 rounded-[2rem] border border-black/10 bg-white/60 p-7">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-[#5b42d5]">Logo history</p>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{generations.length===0?<p className="text-sm text-black/45">No saved logos yet.</p>:generations.map((item)=><article key={item.id} className="rounded-2xl border border-black/10 bg-white p-4">{item.result_url?<img src={item.result_url} alt={`${item.brand_name} logo`} className="aspect-square w-full rounded-xl bg-neutral-100 object-contain"/>:<div className="grid aspect-square place-items-center rounded-xl bg-neutral-100 text-sm text-black/45">{item.status}</div>}<div className="mt-3 flex items-center justify-between gap-3"><div><strong>{item.brand_name}</strong><p className="text-xs text-black/40">{new Date(`${item.created_at}Z`).toLocaleString()}</p></div>{item.result_url?<a href={item.result_url} download={`${item.brand_name}-logo.svg`} className="text-xs font-bold underline">Download</a>:null}</div></article>)}</div>
+        </section>
         {newToken ? (
           <section className="mb-6 rounded-[1.5rem] border border-[#5b42d5]/25 bg-[#d9d3ff] p-6">
             <p className="font-black">Copy this key now. It will not be shown again.</p>

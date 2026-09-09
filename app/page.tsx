@@ -40,6 +40,49 @@ export default function Home() {
   const [isReviewing, setIsReviewing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const rememberResult = (
+    data: WizardData,
+    researchText: string,
+    result: LogoResult,
+    nextIteration: number
+  ) => {
+    try {
+      sessionStorage.setItem('wordmarks:last-result', JSON.stringify({
+        data,
+        research: researchText,
+        logo: result,
+        iteration: nextIteration,
+      }));
+    } catch {
+      // A large data URL can exceed browser storage. The generated logo still works in this tab.
+    }
+  };
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        const saved = sessionStorage.getItem('wordmarks:last-result');
+        if (!saved) return;
+        const parsed = JSON.parse(saved) as {
+          data?: WizardData;
+          research?: string;
+          logo?: LogoResult;
+          iteration?: number;
+        };
+        if (!parsed.data || !parsed.logo?.imageUrl) return;
+        setWizardData(parsed.data);
+        setResearch(parsed.research || '');
+        setLogo(parsed.logo);
+        setCurrentPrompt(parsed.logo.revisedPrompt || '');
+        setIteration(parsed.iteration || 0);
+        setView('result');
+      } catch {
+        sessionStorage.removeItem('wordmarks:last-result');
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   useEffect(() => {
     const elements = document.querySelectorAll<HTMLElement>('[data-reveal]');
     const observer = new IntersectionObserver(
@@ -68,6 +111,7 @@ export default function Home() {
       const result = await generateLogo(data, researchText);
       setLogo(result);
       setCurrentPrompt(result.revisedPrompt);
+      rememberResult(data, researchText, result, 0);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Generation failed');
     } finally {
@@ -77,6 +121,7 @@ export default function Home() {
 
   const handleRegenerate = async () => {
     if (!wizardData) return;
+    if (!window.confirm('Regenerating uses 1 credit. Continue?')) return;
     setIsGenerating(true);
     setError(null);
     try {
@@ -84,6 +129,7 @@ export default function Home() {
       setLogo(result);
       setCurrentPrompt(result.revisedPrompt);
       setQualityReview(null);
+      rememberResult(wizardData, research, result, iteration);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Regeneration failed');
     } finally {
@@ -107,6 +153,7 @@ export default function Home() {
 
   const handleIterate = async () => {
     if (!qualityReview || !logo || !wizardData) return;
+    if (!window.confirm('Creating this revision uses 1 credit. Continue?')) return;
     setIsGenerating(true);
     setError(null);
     try {
@@ -120,7 +167,9 @@ export default function Home() {
       setLogo(result);
       setCurrentPrompt(result.revisedPrompt);
       setQualityReview(null);
-      setIteration((previous) => previous + 1);
+      const nextIteration = iteration + 1;
+      setIteration(nextIteration);
+      rememberResult(wizardData, research, result, nextIteration);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Iteration failed');
     } finally {
@@ -148,6 +197,8 @@ export default function Home() {
   };
 
   const handleNewLogo = () => {
+    sessionStorage.removeItem('wordmarks:last-result');
+    localStorage.removeItem('wordmarks:draft');
     setView('wizard');
     setLogo(null);
     setQualityReview(null);

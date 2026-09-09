@@ -76,6 +76,10 @@ export async function deleteProvider(id: string): Promise<{ deleted: boolean }> 
   return adminCall<{ deleted: boolean }>(`providers?id=${id}`, 'DELETE');
 }
 
+export async function testProvider(provider: { baseUrl: string; textModel: string }): Promise<{ connected: boolean }> {
+  return adminCall<{ connected: boolean }>('provider-test', 'POST', provider);
+}
+
 // ─── Settings API ───────────────────────────────────────
 
 export interface AdminSettings {

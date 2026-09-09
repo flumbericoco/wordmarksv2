@@ -4,6 +4,7 @@
 import { authenticateRequest, type AuthContext } from './auth';
 import { checkRateLimit, rateLimitHeaders } from './rate-limit';
 import { UnauthorizedError, RateLimitError, errorResponse } from '../../lib/errors';
+import { getUserSession } from './user-auth';
 
 interface Env {
   DB: D1Database;
@@ -75,7 +76,11 @@ export const onRequest = async (context: MiddlewareContext): Promise<Response> =
   const isAdminRoute = functionPath.includes('/admin/');
 
   // Authenticate
-  const auth: AuthContext = await authenticateRequest(request, env, isAdminRoute);
+  let auth: AuthContext = await authenticateRequest(request, env, isAdminRoute);
+  if (!auth.authenticated && !isAdminRoute) {
+    const user = await getUserSession(request, env.DB).catch(() => null);
+    if (user) auth = { authenticated: true, isAdmin: false, actor: `user:${user.id}` };
+  }
 
   if (isAdminRoute && !auth.isAdmin) {
     return addHeaders(

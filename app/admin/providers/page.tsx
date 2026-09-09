@@ -6,6 +6,7 @@ import {
   createProvider,
   updateProvider,
   deleteProvider,
+  testProvider,
   type AdminProvider,
 } from '@/lib/admin-api';
 
@@ -24,6 +25,7 @@ export default function ProvidersPage() {
   const [form, setForm] = useState<Partial<AdminProvider>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadProviders = async () => {
@@ -88,6 +90,7 @@ export default function ProvidersPage() {
   };
 
   const handleDelete = async (id: string) => {
+    if (!window.confirm('Delete this provider? This cannot be undone.')) return;
     try {
       await deleteProvider(id);
       await loadProviders();
@@ -103,6 +106,19 @@ export default function ProvidersPage() {
       await loadProviders();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to set active');
+    }
+  };
+
+  const handleTest = async () => {
+    setTesting(true);
+    setError(null);
+    try {
+      await testProvider({ baseUrl: form.baseUrl || '', textModel: form.textModel || '' });
+      window.alert('Connection successful. The provider accepted a chat completion request.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Connection test failed');
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -194,6 +210,14 @@ export default function ProvidersPage() {
                     </div>
                   </div>
                   <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleTest}
+                      disabled={testing || !form.baseUrl || !form.textModel}
+                      className="rounded-lg border border-blue-500/40 px-4 py-2 text-sm font-semibold text-blue-300 disabled:opacity-50"
+                    >
+                      {testing ? 'Testing...' : 'Test connection'}
+                    </button>
                     <button
                       onClick={handleSave}
                       disabled={saving}

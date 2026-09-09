@@ -134,5 +134,13 @@ export const onRequest: PagesFunction<Env> = async ({ request, env, params }) =>
     return json({ ok: true, credits: user.credits, ledger: ledger.results || [] });
   }
 
+  if (action === 'generations' && request.method === 'GET') {
+    const rows = await env.DB.prepare(
+      `SELECT id,brand_name,status,model,result_url,error,duration_ms,created_at,completed_at
+       FROM generation_jobs WHERE user_id=? ORDER BY created_at DESC LIMIT 50`
+    ).bind(user.id).all();
+    return json({ ok: true, generations: rows.results || [] });
+  }
+
   return json({ error: 'Not found' }, 404);
 };

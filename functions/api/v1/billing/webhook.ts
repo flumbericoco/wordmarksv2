@@ -72,7 +72,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const metadata = object.metadata as Record<string, string> | undefined;
     const userId = metadata?.user_id;
     const plan = metadata?.plan;
+    const kind = metadata?.kind;
     const paymentStatus = String(object.payment_status || '');
+    if (userId && kind === 'topup' && paymentStatus === 'paid') {
+      await addCredits(env.DB, userId, 25, 'credit_topup', `checkout:${String(object.id)}`);
+      await env.DB.prepare(`INSERT INTO payment_transactions(id,user_id,stripe_checkout_id,stripe_payment_intent_id,kind,amount,currency,credits,status) VALUES (?,?,?,?,?,?,?,?, 'paid') ON CONFLICT(stripe_checkout_id) DO UPDATE SET status='paid',updated_at=datetime('now')`)
+        .bind(crypto.randomUUID(),userId,String(object.id),String(object.payment_intent||''),'topup',Number(object.amount_total||0),String(object.currency||'usd'),25).run();
+    }
     if (userId && plan && paymentStatus === 'paid') {
       await addCredits(env.DB, userId, 25, 'initial_credit_pack', `checkout:${String(object.id)}`);
       await env.DB.batch([

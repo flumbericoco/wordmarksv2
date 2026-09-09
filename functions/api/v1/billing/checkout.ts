@@ -56,6 +56,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     'line_items[1][quantity]': '1',
     'metadata[user_id]': user.id,
     'metadata[plan]': plan,
+    'metadata[kind]': 'subscription',
     // The $25 one-time item is charged today. The recurring plan starts in 30 days.
     'subscription_data[trial_period_days]': '30',
     'subscription_data[metadata][user_id]': user.id,

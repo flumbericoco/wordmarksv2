@@ -153,6 +153,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${env.WORDMARKS_MCP_TOKEN || ''}`,
           'X-Request-ID': crypto.randomUUID(),
+          'X-Wordmarks-User-ID': apiUser.id,
         },
         body: JSON.stringify(args),
       });

@@ -74,6 +74,7 @@ export default function KnowledgeBasePage() {
   };
 
   const handleDelete = async (id: string) => {
+    if (!window.confirm('Delete this reference image? This cannot be undone.')) return;
     try {
       await deleteKBItem(id);
       setItems((prev) => prev.filter((i) => i.id !== id));

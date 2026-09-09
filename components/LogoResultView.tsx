@@ -68,7 +68,7 @@ export default function LogoResultView({
               onClick={onDownload}
               className="rounded-lg bg-green-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-green-500 transition-colors"
             >
-              ↓ Download PNG
+              ↓ Download {imageUrl.startsWith('data:image/svg+xml') ? 'SVG' : 'PNG'}
             </button>
           </div>
         </div>
