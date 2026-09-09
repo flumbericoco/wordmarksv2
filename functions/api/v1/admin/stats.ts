@@ -76,6 +76,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         stripe: env.STRIPE_SECRET_KEY && env.STRIPE_WEBHOOK_SECRET ? 'configured' : 'missing',
         email: env.RESEND_API_KEY ? 'configured' : 'missing',
       },
+      environment: env.STRIPE_SECRET_KEY
+        ? (env.STRIPE_SECRET_KEY.startsWith('sk_test_') ? 'Sandbox' : 'Live')
+        : 'Unconfigured',
     }, requestId);
   } catch (err) {
     return errorResponse(err, requestId);

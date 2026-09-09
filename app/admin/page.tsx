@@ -37,7 +37,7 @@ export default function AdminDashboard() {
         </div>
         <div className="rounded-2xl border border-black/10 bg-white/45 px-5 py-3">
           <p className="text-[9px] font-black uppercase tracking-[0.16em] text-black/35">Environment</p>
-          <p className="mt-1 flex items-center gap-2 text-xs font-bold"><span className="h-2 w-2 rounded-full bg-[#61c454]" /> Production</p>
+          <p className="mt-1 flex items-center gap-2 text-xs font-bold"><span className={`h-2 w-2 rounded-full ${stats?.environment === 'Live' ? 'bg-[#61c454]' : 'bg-amber-500'}`} /> {loading ? 'Checking...' : stats?.environment || 'Unconfigured'}</p>
         </div>
       </section>
 
@@ -65,7 +65,7 @@ export default function AdminDashboard() {
       </section>
 
       <section className="rounded-[1.75rem] border border-black/10 bg-white/55 p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-black/35">Service readiness</p><h2 className="mt-1 text-2xl font-black">Production dependencies</h2></div><span className="text-xs text-black/40">Configuration status, not synthetic uptime</span></div>
+        <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-black/35">Service readiness</p><h2 className="mt-1 text-2xl font-black">Production dependencies</h2></div><span className="text-xs text-black/40">Configuration status only; test providers from the Providers page</span></div>
         <div className="mt-5 grid gap-3 sm:grid-cols-4">{Object.entries(stats?.services || {}).map(([name, status]) => <div key={name} className="rounded-2xl border border-black/10 bg-white p-4"><p className="text-xs font-black uppercase">{name}</p><p className={`mt-2 text-sm font-bold ${status === 'missing' ? 'text-red-700' : 'text-green-700'}`}>{status}</p></div>)}</div>
       </section>
 

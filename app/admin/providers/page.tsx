@@ -148,6 +148,24 @@ export default function ProvidersPage() {
         </div>
       )}
 
+      {editing === 'new' && (
+        <div className="space-y-4 rounded-xl border border-blue-500/30 bg-white/5 p-5">
+          <h2 className="text-sm font-semibold text-white">Add provider</h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="text-xs text-zinc-400">Name<input value={form.name || ''} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white" /></label>
+            <label className="text-xs text-zinc-400">Base URL<input value={form.baseUrl || ''} onChange={(e) => setForm({ ...form, baseUrl: e.target.value })} className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white" /></label>
+            <label className="text-xs text-zinc-400">Text model<input value={form.textModel || ''} onChange={(e) => setForm({ ...form, textModel: e.target.value })} className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white" /></label>
+            <label className="text-xs text-zinc-400">Image model (optional)<input value={form.imageModel || ''} onChange={(e) => setForm({ ...form, imageModel: e.target.value })} className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white" /></label>
+          </div>
+          <label className="flex items-center gap-2 text-xs text-zinc-300"><input type="checkbox" checked={Boolean(form.isActive)} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} /> Make active after saving</label>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={handleTest} disabled={testing || !form.baseUrl || !form.textModel} className="rounded-lg border border-blue-500/40 px-4 py-2 text-sm font-semibold text-blue-300 disabled:opacity-50">{testing ? 'Testing...' : 'Test connection'}</button>
+            <button onClick={handleSave} disabled={saving || !form.name || !form.baseUrl || !form.textModel} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{saving ? 'Saving...' : 'Save provider'}</button>
+            <button onClick={() => { setEditing(null); setForm({}); }} className="rounded-lg border border-white/10 px-4 py-2 text-sm text-zinc-400">Cancel</button>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="rounded-xl border border-white/10 bg-white/5 p-8 text-center">
           <p className="text-sm text-zinc-500">Loading providers...</p>

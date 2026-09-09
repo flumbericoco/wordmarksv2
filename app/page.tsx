@@ -75,6 +75,13 @@ export default function Home() {
     }
   };
 
+  const refreshCredits = () => {
+    void fetch('/api/v1/account/me', { credentials: 'same-origin' })
+      .then(async (response) => response.ok ? response.json() as Promise<{ user?: { email: string; credits: number } }> : null)
+      .then((payload) => setAccount(payload?.user || null))
+      .catch(() => undefined);
+  };
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
       try {
@@ -137,6 +144,7 @@ export default function Home() {
       setError(e instanceof Error ? e.message : 'Generation failed');
     } finally {
       setIsGenerating(false);
+      refreshCredits();
     }
   };
 
@@ -159,6 +167,7 @@ export default function Home() {
       setError(e instanceof Error ? e.message : 'Regeneration failed');
     } finally {
       setIsGenerating(false);
+      refreshCredits();
     }
   };
 
@@ -204,6 +213,7 @@ export default function Home() {
       setError(e instanceof Error ? e.message : 'Iteration failed');
     } finally {
       setIsGenerating(false);
+      refreshCredits();
     }
   };
 
@@ -538,10 +548,16 @@ export default function Home() {
                   </div>
                   <div>
                     <p className="text-lg font-bold">Crafting your wordmark...</p>
-                    <p className="mt-1 text-sm text-white/40">Finding the right form for your name</p>
+                    <p className="mt-1 text-sm text-white/40">Preparing prompt → generating → validating SVG → saving</p>
                   </div>
                 </div>
-              ) : null}
+              ) : (
+                <div className="flex flex-col items-center gap-4 py-20 text-center">
+                  <h3 className="text-2xl font-black">Your credit is safe.</h3>
+                  <p className="max-w-md text-sm leading-6 text-white/45">The provider could not finish this logo. Failed generations are refunded automatically.</p>
+                  <div className="flex flex-wrap justify-center gap-3"><button onClick={handleRegenerate} className="rounded-full bg-[#c6ff4a] px-5 py-3 text-xs font-black uppercase text-black">Retry generation</button><button onClick={handleNewLogo} className="rounded-full border border-white/15 px-5 py-3 text-xs font-black uppercase text-white">Edit brief</button></div>
+                </div>
+              )}
             </div>
           </div>
         </section>

@@ -45,6 +45,7 @@ export default function AccountPage() {
   });
   const [busy, setBusy] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
+  const [showRevokedKeys, setShowRevokedKeys] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -94,6 +95,8 @@ export default function AccountPage() {
     try {
       await api(`account/${mode}`, { method: 'POST', body: JSON.stringify({ email, password }) });
       setPassword(''); await load();
+      const next = new URLSearchParams(window.location.search).get('next');
+      if (next?.startsWith('/') && !next.startsWith('//')) window.location.assign(next);
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Unable to continue'); }
     finally { setBusy(false); }
   }
@@ -255,9 +258,9 @@ export default function AccountPage() {
         ) : null}
 
         <section className="rounded-[2rem] border border-black/10 bg-white/60 p-7">
-          <div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[0.18em] text-[#5b42d5]">Developer API keys</p><h2 className="mt-2 text-3xl font-black tracking-[-0.05em]">Connect your AI agents</h2></div><button disabled={busy} onClick={createKey} className="rounded-full bg-[#171714] px-5 py-3 text-xs font-black uppercase tracking-wider text-white disabled:opacity-50">Create API key</button></div>
+          <div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[0.18em] text-[#5b42d5]">Developer API keys</p><h2 className="mt-2 text-3xl font-black tracking-[-0.05em]">Connect your AI agents</h2></div><div className="flex items-center gap-3"><label className="text-xs text-black/50"><input type="checkbox" checked={showRevokedKeys} onChange={(event) => setShowRevokedKeys(event.target.checked)} className="mr-2"/>Show revoked</label><button disabled={busy} onClick={createKey} className="rounded-full bg-[#171714] px-5 py-3 text-xs font-black uppercase tracking-wider text-white disabled:opacity-50">Create API key</button></div></div>
           <div className="mt-6 divide-y divide-black/10 border-y border-black/10">
-            {keys.length === 0 ? <p className="py-6 text-sm text-black/45">No API keys yet.</p> : keys.map((key) => (
+            {keys.filter((key) => showRevokedKeys || !key.revoked_at).length === 0 ? <p className="py-6 text-sm text-black/45">No active API keys.</p> : keys.filter((key) => showRevokedKeys || !key.revoked_at).map((key) => (
               <div key={key.id} className="flex items-center justify-between gap-4 py-4"><div><p className="font-bold">{key.name}</p><code className="text-xs text-black/45">{key.key_prefix}</code><p className="mt-1 text-[11px] text-black/40">{key.last_used_at ? `Last used ${new Date(`${key.last_used_at}Z`).toLocaleString()}` : 'Never used'}</p></div>{key.revoked_at ? <span className="text-xs text-red-600">Revoked</span> : <button onClick={() => revokeKey(key.id)} className="text-xs font-bold text-red-700">Revoke</button>}</div>
             ))}
           </div>
@@ -266,7 +269,7 @@ export default function AccountPage() {
         <section className="mt-6 rounded-[2rem] border border-red-200 bg-red-50 p-7">
           <p className="text-xs font-black uppercase tracking-[0.18em] text-red-700">Danger zone</p>
           <h2 className="mt-2 text-2xl font-black">Delete account</h2>
-          <p className="mt-2 text-sm text-red-900/60">This permanently removes your account data. Active subscriptions must be cancelled first.</p>
+          <p className="mt-2 text-sm text-red-900/60">This permanently removes your profile, credits, API keys, and logo history. Active subscriptions must be cancelled first. Payment providers may retain invoice and transaction records where legally required.</p>
           <div className="mt-4 flex flex-col gap-3 sm:flex-row"><input type="password" value={deletePassword} onChange={(event) => setDeletePassword(event.target.value)} placeholder="Confirm your password" className="rounded-xl border border-red-200 bg-white px-4 py-3 text-sm"/><button disabled={busy || !deletePassword} onClick={deleteAccount} className="rounded-full bg-red-700 px-5 py-3 text-xs font-black uppercase text-white disabled:opacity-50">Delete permanently</button></div>
         </section>
       </div>

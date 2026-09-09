@@ -118,7 +118,8 @@ function sanitizeGeneratedSvg(raw: string): string {
     /<\/?(?:script|foreignObject|iframe|object|embed|audio|video|style)\b/i,
     /\son[a-z]+\s*=/i,
     /\s(?:href|xlink:href)\s*=/i,
-    /(?:javascript:|data:text\/html|@import|url\s*\()/i,
+    /(?:javascript:|data:text\/html|@import)/i,
+    /url\s*\(\s*['"]?(?!#)[^)]+\)/i,
     /<!DOCTYPE|<!ENTITY/i,
   ];
   if (forbidden.some((pattern) => pattern.test(svg))) {
@@ -132,19 +133,27 @@ async function generateSvgWordmark(
   brandName: string,
   provider: { apiKey: string; baseUrl: string; textModel: string },
 ): Promise<{ url: string; revisedPrompt: string }> {
-  const content = await chatCompletionServer(
-    'You are an expert identity designer and SVG artist. Return one complete, valid, self-contained SVG only. Do not use markdown, scripts, external URLs, external fonts, or foreignObject. Use a 1200x1200 viewBox, vector shapes, text, and system font fallbacks.',
-    `Create a polished typography-first wordmark logo for "${brandName}". ${prompt}`,
-    provider.apiKey,
-    provider.baseUrl,
-    provider.textModel,
-    { temperature: 0.8, responseFormat: false, timeoutMs: 60_000 },
-  );
-  const svg = sanitizeGeneratedSvg(content);
-  return {
-    url: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,
-    revisedPrompt: prompt,
-  };
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const correction = attempt > 0
+      ? ' Previous output failed safety validation. Use only svg, g, path, rect, circle, line, polygon and text elements with inline presentation attributes. Never use style, script, href, foreignObject, embedded content, CSS imports, event handlers, or external URLs. Fragment references such as url(#gradient) are allowed.'
+      : '';
+    const content = await chatCompletionServer(
+      'You are an expert identity designer and SVG artist. Return one complete, valid, self-contained SVG only. Do not use markdown, style tags, scripts, event handlers, href, external URLs, external fonts, embedded content, or foreignObject. Use a 1200x1200 viewBox, safe vector shapes, inline presentation attributes, text, and system font fallbacks.',
+      `Create a polished typography-first wordmark logo for "${brandName}". ${prompt}${correction}`,
+      provider.apiKey,
+      provider.baseUrl,
+      provider.textModel,
+      { temperature: attempt ? 0.55 : 0.8, responseFormat: false, timeoutMs: 60_000 },
+    );
+    try {
+      const svg = sanitizeGeneratedSvg(content);
+      return { url: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`, revisedPrompt: prompt };
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('Invalid SVG');
+    }
+  }
+  throw lastError || new Error('Provider did not return a safe SVG after retries');
 }
 
 async function handleGenerate(

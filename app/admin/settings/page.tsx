@@ -85,6 +85,7 @@ export default function SettingsPage() {
         {/* Image Generation */}
         <div className="rounded-xl border border-white/10 bg-white/5 p-6 space-y-4">
           <h3 className="text-sm font-semibold text-white">Image Generation</h3>
+          <p className="text-xs leading-5 text-zinc-500">Quality and size apply only when an image-model provider returns raster artwork. SVG wordmarks are vector output and ignore these two settings.</p>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -123,7 +124,7 @@ export default function SettingsPage() {
               onChange={(e) => setSettings({ ...settings, maxIterations: parseInt(e.target.value) || 3 })}
               className="w-32 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-blue-500/50"
             />
-            <p className="mt-1 text-xs text-zinc-600">How many times to iterate if quality score is below 9</p>
+            <p className="mt-1 text-xs text-zinc-600">Maximum automatic review iterations when auto-review is enabled. Manual user revisions remain separate.</p>
           </div>
         </div>
 
@@ -146,7 +147,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <p className="text-sm text-white">Auto-review quality</p>
-              <p className="text-xs text-zinc-500">Run the quality review automatically after every successful generation</p>
+              <p className="text-xs text-zinc-500">Run an extra AI request after every successful generation. It uses no user credit, but adds provider cost and processing time.</p>
             </div>
           </label>
 
