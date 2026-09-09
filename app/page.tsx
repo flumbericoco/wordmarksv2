@@ -278,7 +278,7 @@ export default function Home() {
                 </div>
                 <h1 className="max-w-3xl text-[clamp(3.55rem,8vw,6.8rem)] font-black leading-[0.8] tracking-[-0.085em]">
                   Make your
-                  <span className="relative mt-4 block font-serif font-normal italic tracking-[-0.06em] text-[#ff5c35]">name iconic.</span>
+                  <span className="relative mt-4 block font-serif font-normal italic tracking-[-0.06em] text-[#d94324]">name iconic.</span>
                 </h1>
                 <p className="mt-6 max-w-xl text-base leading-7 text-black/60 sm:text-lg">
                   Distinctive, typography-first logos shaped by strategy and refined by AI—ready in minutes, not weeks.
@@ -288,9 +288,9 @@ export default function Home() {
                     Start creating
                     <span className="grid h-9 w-9 place-items-center rounded-full bg-[#ff5c35] transition-transform group-hover:rotate-45" aria-hidden="true">↗</span>
                   </a>
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-black/45">No design skills needed</span>
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-black/65">No design skills needed</span>
                 </div>
-                <p className="mt-4 text-xs text-black/45">Create an account and receive 10 beta credits. One successful logo generation uses one credit.</p>
+                <p className="mt-4 text-xs text-black/65">Create an account and receive 10 beta credits. One successful logo generation uses one credit.</p>
               </div>
 
               <div className="relative mx-auto aspect-square w-full max-w-[380px] lg:justify-self-end">
@@ -381,9 +381,9 @@ export default function Home() {
                   <p className="mt-6 max-w-xl text-base leading-7 text-black/60">
                     Connect Wordmarks once, then create production-ready SVG logos from Codex, Kilo, Zcode, Claude Code, or any MCP-compatible CLI using natural language.
                   </p>
-                  <div className="mt-7 flex flex-wrap gap-2" aria-label="Compatible AI agents">
+                  <div className="mt-7 flex flex-wrap gap-2" role="list" aria-label="Compatible AI agents">
                     {['Codex', 'Kilo', 'Zcode', 'Claude Code', 'Any MCP client'].map((agent) => (
-                      <span key={agent} className="rounded-full border border-black/15 bg-white/45 px-3 py-1.5 text-xs font-bold">{agent}</span>
+                      <span role="listitem" key={agent} className="rounded-full border border-black/15 bg-white/45 px-3 py-1.5 text-xs font-bold">{agent}</span>
                     ))}
                   </div>
                 </div>
