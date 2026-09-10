@@ -1,7 +1,7 @@
 // ─── Main API Handler: /api/v1/[action] ─────────────────
 // Routes: research, generate-logo, review-logo, iterate-logo
 
-import { buildResearchPrompt, buildDallePrompt, getQualityReviewPrompt, getIterationPrompt } from '../../lib/prompts';
+import { buildResearchPrompt, buildIdentityLogoPrompt, getVisualQualityReviewPrompt, getIterationPrompt } from '../../lib/prompts';
 import { AppError, ValidationError, ProviderError, successResponse, errorResponse } from '../../lib/errors';
 import {
   validateResearchRequest,
@@ -16,6 +16,7 @@ import {
 import {
   isAllowedProvider,
   chatCompletionServer,
+  chatCompletionWithImageServer,
   generateImageServer,
   parseJsonResponse,
 } from './providers';
@@ -132,15 +133,15 @@ async function generateSvgWordmark(
   prompt: string,
   brandName: string,
   provider: { apiKey: string; baseUrl: string; textModel: string },
-): Promise<{ url: string; revisedPrompt: string }> {
+): Promise<{ url: string }> {
   let lastError: Error | null = null;
   for (let attempt = 0; attempt < 3; attempt++) {
     const correction = attempt > 0
       ? ' Previous output failed safety validation. Use only svg, g, path, rect, circle, line, polygon and text elements with inline presentation attributes. Never use style, script, href, foreignObject, embedded content, CSS imports, event handlers, or external URLs. Fragment references such as url(#gradient) are allowed.'
       : '';
     const content = await chatCompletionServer(
-      'You are an expert identity designer and SVG artist. Return one complete, valid, self-contained SVG only. Do not use markdown, style tags, scripts, event handlers, href, external URLs, external fonts, embedded content, or foreignObject. Use a 1200x1200 viewBox, safe vector shapes, inline presentation attributes, text, and system font fallbacks.',
-      `Create a polished typography-first wordmark logo for "${brandName}". ${prompt}${correction}`,
+      'You are a world-class identity designer and SVG artist. Create a complete logo system mark, not a text treatment. Return one valid self-contained SVG only, with a 1200x800 viewBox and transparent artboard. Use simple paths, geometric shapes, and readable text with system font fallbacks. Include a distinctive symbol and a carefully spaced wordmark unless the brief explicitly requests wordmark-only. Do not use markdown, style tags, scripts, event handlers, href, external URLs, external fonts, embedded content, or foreignObject.',
+      `${prompt}${correction}`,
       provider.apiKey,
       provider.baseUrl,
       provider.textModel,
@@ -148,7 +149,7 @@ async function generateSvgWordmark(
     );
     try {
       const svg = sanitizeGeneratedSvg(content);
-      return { url: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`, revisedPrompt: prompt };
+      return { url: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}` };
     } catch (error) {
       lastError = error instanceof Error ? error : new Error('Invalid SVG');
     }
@@ -175,14 +176,18 @@ async function handleGenerate(
     ).bind(jobId, requestId, userId || null, body.brandName, provider.imageModel).run();
 
   try {
-    let prompt = buildDallePrompt({
+    let prompt = buildIdentityLogoPrompt({
       brandName: body.brandName,
       description: body.description || '',
       style: body.style,
       colorPreference: body.colorPreference,
       layout: body.layout,
       referenceImages: body.referenceImages || [],
-    } as import('../../lib/types').WizardData);
+    } as import('../../lib/types').WizardData, {
+      variationSeed: body.variationSeed,
+      improvementNotes: body.improvementNotes,
+      research: body.researchContext,
+    });
     const kbEnabled = await db.prepare("SELECT value FROM settings WHERE key='knowledgeBaseEnabled'").first<{ value: string }>();
     if (kbEnabled?.value !== 'false') {
       const references = await db.prepare(
@@ -251,7 +256,7 @@ async function handleGenerate(
 
     return {
       imageUrl: result.url,
-      revisedPrompt: result.revisedPrompt,
+      generationId: jobId,
       ...(r2Key ? { r2Key } : {}),
     };
   } catch (err) {
@@ -271,16 +276,28 @@ async function handleReview(
   body: ReviewRequest,
   provider: { apiKey: string; baseUrl: string; textModel: string },
 ): Promise<unknown> {
-  const reviewPrompt = getQualityReviewPrompt(body.revisedPrompt, body.brandName);
+  const isSvg = body.imageUrl.startsWith('data:image/svg+xml');
+  const comma = body.imageUrl.indexOf(',');
+  const svgMarkup = isSvg && comma >= 0 ? decodeURIComponent(body.imageUrl.slice(comma + 1)) : '';
+  const reviewPrompt = getVisualQualityReviewPrompt(svgMarkup, body.brandName, body.description);
 
-  const content = await chatCompletionServer(
-    'You are an expert logo quality reviewer. Output ONLY valid JSON.',
-    reviewPrompt,
-    provider.apiKey,
-    provider.baseUrl,
-    provider.textModel,
-    { temperature: 0.3, responseFormat: true },
-  );
+  const content = isSvg
+    ? await chatCompletionServer(
+        'You are an expert logo quality reviewer. Output ONLY valid JSON.',
+        reviewPrompt,
+        provider.apiKey,
+        provider.baseUrl,
+        provider.textModel,
+        { temperature: 0.3, responseFormat: true },
+      )
+    : await chatCompletionWithImageServer(
+        'You are an expert logo quality reviewer. Inspect the supplied image and output ONLY valid JSON.',
+        reviewPrompt,
+        body.imageUrl,
+        provider.apiKey,
+        provider.baseUrl,
+        provider.textModel,
+      );
 
   return parseJsonResponse(content);
 }

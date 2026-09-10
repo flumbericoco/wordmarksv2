@@ -1,5 +1,4 @@
 import { WizardData, LogoResult, QualityScore, AiRecommendations } from './types';
-import { buildResearchPrompt, buildDallePrompt, getQualityReviewPrompt, getIterationPrompt } from './prompts';
 
 // ─── Server API Client ──────────────────────────────────
 // All API calls go through this deployment's Cloudflare Pages Functions.
@@ -70,6 +69,7 @@ export async function generateLogo(
   data: WizardData,
   research?: string,
   _userApiKey?: string, // Ignored - keys are server-side only
+  improvementNotes?: string[],
 ): Promise<LogoResult> {
   return apiCall<LogoResult>('generate-logo', {
     brandName: data.brandName,
@@ -78,17 +78,22 @@ export async function generateLogo(
     colorPreference: data.colorPreference,
     layout: data.layout,
     referenceImages: data.referenceImages,
+    variationSeed: crypto.randomUUID(),
+    improvementNotes,
+    researchContext: research?.slice(0, 2000),
   });
 }
 
 export async function reviewLogo(
-  revisedPrompt: string,
+  imageUrl: string,
   brandName: string,
+  description?: string,
   _userApiKey?: string, // Ignored - keys are server-side only
 ): Promise<QualityScore> {
   return apiCall<QualityScore>('review-logo', {
-    revisedPrompt,
+    imageUrl,
     brandName,
+    description,
   });
 }
 

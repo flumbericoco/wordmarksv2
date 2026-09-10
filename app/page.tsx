@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { WizardData, LogoResult, QualityScore } from '@/lib/types';
-import { generateLogo, reviewLogo, iterateLogo } from '@/lib/api';
+import { generateLogo, reviewLogo } from '@/lib/api';
 import WizardContainer from '@/components/wizard/WizardContainer';
 import LogoResultView from '@/components/LogoResultView';
 
@@ -35,7 +35,6 @@ export default function Home() {
   const [logo, setLogo] = useState<LogoResult | null>(null);
   const [qualityReview, setQualityReview] = useState<QualityScore | null>(null);
   const [iteration, setIteration] = useState(0);
-  const [currentPrompt, setCurrentPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isReviewing, setIsReviewing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,7 +96,6 @@ export default function Home() {
         setWizardData(parsed.data);
         setResearch(parsed.research || '');
         setLogo(parsed.logo);
-        setCurrentPrompt(parsed.logo.revisedPrompt || '');
         setIteration(parsed.iteration || 0);
         setView('result');
       } catch {
@@ -134,10 +132,9 @@ export default function Home() {
     try {
       const result = await generateLogo(data, researchText);
       setLogo(result);
-      setCurrentPrompt(result.revisedPrompt);
       rememberResult(data, researchText, result, 0);
       if (autoReview) {
-        const review = await reviewLogo(result.revisedPrompt, data.brandName).catch(() => null);
+        const review = await reviewLogo(result.imageUrl, data.brandName, data.description).catch(() => null);
         if (review) setQualityReview(review);
       }
     } catch (e: unknown) {
@@ -156,11 +153,12 @@ export default function Home() {
     try {
       const result = await generateLogo(wizardData, research);
       setLogo(result);
-      setCurrentPrompt(result.revisedPrompt);
       setQualityReview(null);
-      rememberResult(wizardData, research, result, iteration);
+      const nextIteration = iteration + 1;
+      setIteration(nextIteration);
+      rememberResult(wizardData, research, result, nextIteration);
       if (autoReview) {
-        const review = await reviewLogo(result.revisedPrompt, wizardData.brandName).catch(() => null);
+        const review = await reviewLogo(result.imageUrl, wizardData.brandName, wizardData.description).catch(() => null);
         if (review) setQualityReview(review);
       }
     } catch (e: unknown) {
@@ -176,7 +174,7 @@ export default function Home() {
     setIsReviewing(true);
     setError(null);
     try {
-      const review = await reviewLogo(logo.revisedPrompt, wizardData.brandName);
+      const review = await reviewLogo(logo.imageUrl, wizardData.brandName, wizardData.description);
       setQualityReview(review);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Review failed');
@@ -192,21 +190,14 @@ export default function Home() {
     setIsGenerating(true);
     setError(null);
     try {
-      const refinedPrompt = await iterateLogo(
-        currentPrompt,
-        qualityReview.feedback,
-        qualityReview.suggestions,
-        wizardData
-      );
-      const result = await generateLogo({ ...wizardData, description: refinedPrompt }, research);
+      const result = await generateLogo(wizardData, research, undefined, qualityReview.suggestions);
       setLogo(result);
-      setCurrentPrompt(result.revisedPrompt);
       setQualityReview(null);
       const nextIteration = iteration + 1;
       setIteration(nextIteration);
       rememberResult(wizardData, research, result, nextIteration);
       if (autoReview) {
-        const review = await reviewLogo(result.revisedPrompt, wizardData.brandName).catch(() => null);
+        const review = await reviewLogo(result.imageUrl, wizardData.brandName, wizardData.description).catch(() => null);
         if (review) setQualityReview(review);
       }
     } catch (e: unknown) {
@@ -217,16 +208,32 @@ export default function Home() {
     }
   };
 
-  const handleDownload = async () => {
+  const handleDownload = async (format: 'svg' | 'png') => {
     if (!logo?.imageUrl || !wizardData) return;
     try {
       const response = await fetch(logo.imageUrl);
-      const blob = await response.blob();
+      let blob = await response.blob();
+      if (format === 'png' && logo.imageUrl.startsWith('data:image/svg+xml')) {
+        const sourceUrl = URL.createObjectURL(blob);
+        try {
+          const image = new Image();
+          image.src = sourceUrl;
+          await image.decode();
+          const canvas = document.createElement('canvas');
+          canvas.width = 2400;
+          canvas.height = 1600;
+          const context = canvas.getContext('2d');
+          if (!context) throw new Error('PNG conversion is unavailable');
+          context.drawImage(image, 0, 0, canvas.width, canvas.height);
+          blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((result) => result ? resolve(result) : reject(new Error('PNG conversion failed')), 'image/png'));
+        } finally {
+          URL.revokeObjectURL(sourceUrl);
+        }
+      }
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      const extension = logo.imageUrl.startsWith('data:image/svg+xml') ? 'svg' : 'png';
-      anchor.download = `${wizardData.brandName.toLowerCase().replace(/\s+/g, '-')}-logo.${extension}`;
+      anchor.download = `${wizardData.brandName.toLowerCase().replace(/\s+/g, '-')}-logo.${format}`;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
@@ -243,7 +250,6 @@ export default function Home() {
     setLogo(null);
     setQualityReview(null);
     setIteration(0);
-    setCurrentPrompt('');
     setError(null);
     requestAnimationFrame(() => document.querySelector('#create')?.scrollIntoView({ behavior: 'smooth' }));
   };
@@ -528,7 +534,6 @@ export default function Home() {
               ) : logo ? (
                 <LogoResultView
                   imageUrl={logo.imageUrl}
-                  revisedPrompt={logo.revisedPrompt}
                   qualityReview={qualityReview}
                   brandName={wizardData?.brandName || ''}
                   iteration={iteration}

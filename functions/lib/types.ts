@@ -48,7 +48,7 @@ export interface AiRecommendations {
 
 export interface LogoResult {
   imageUrl: string;
-  revisedPrompt: string;
+  generationId: string;
 }
 
 export interface QualityScore {

@@ -59,11 +59,14 @@ export interface GenerateRequest {
   colorPreference?: string;
   layout?: string;
   referenceImages?: string[];
+  variationSeed?: string;
+  improvementNotes?: string[];
+  researchContext?: string;
 }
 
 export function validateGenerateRequest(body: unknown): ValidationResult<GenerateRequest> {
   if (!isObject(body)) return { valid: false, error: 'Request body must be a JSON object' };
-  const { brandName, description, style, colorPreference, layout, referenceImages } = body;
+  const { brandName, description, style, colorPreference, layout, referenceImages, variationSeed, improvementNotes, researchContext } = body;
 
   if (!isString(brandName) || brandName.trim().length === 0) {
     return { valid: false, error: 'brandName is required' };
@@ -91,6 +94,15 @@ export function validateGenerateRequest(body: unknown): ValidationResult<Generat
       return { valid: false, error: 'referenceImages must have 5 or fewer items' };
     }
   }
+  if (variationSeed !== undefined && (!isString(variationSeed) || variationSeed.length > 100)) {
+    return { valid: false, error: 'variationSeed must be a short string' };
+  }
+  if (improvementNotes !== undefined && (!isArray(improvementNotes) || improvementNotes.length > 5 || improvementNotes.some((note) => !isString(note) || note.length > 240))) {
+    return { valid: false, error: 'improvementNotes must contain up to 5 short strings' };
+  }
+  if (researchContext !== undefined && (!isString(researchContext) || researchContext.length > 2000)) {
+    return { valid: false, error: 'researchContext must be 2000 characters or less' };
+  }
 
   return {
     valid: true,
@@ -101,6 +113,9 @@ export function validateGenerateRequest(body: unknown): ValidationResult<Generat
       colorPreference: colorPreference?.trim() || undefined,
       layout: layout?.trim() || undefined,
       referenceImages: isArray(referenceImages) ? (referenceImages as string[]) : undefined,
+      variationSeed: isString(variationSeed) ? variationSeed : undefined,
+      improvementNotes: isArray(improvementNotes) ? improvementNotes as string[] : undefined,
+      researchContext: isString(researchContext) ? researchContext : undefined,
     },
   };
 }
@@ -108,16 +123,17 @@ export function validateGenerateRequest(body: unknown): ValidationResult<Generat
 // ─── Review Request ─────────────────────────────────────
 
 export interface ReviewRequest {
-  revisedPrompt: string;
+  imageUrl: string;
   brandName: string;
+  description?: string;
 }
 
 export function validateReviewRequest(body: unknown): ValidationResult<ReviewRequest> {
   if (!isObject(body)) return { valid: false, error: 'Request body must be a JSON object' };
-  const { revisedPrompt, brandName } = body;
+  const { imageUrl, brandName, description } = body;
 
-  if (!isString(revisedPrompt) || revisedPrompt.trim().length === 0) {
-    return { valid: false, error: 'revisedPrompt is required' };
+  if (!isString(imageUrl) || (!imageUrl.startsWith('data:image/') && !imageUrl.startsWith('https://')) || imageUrl.length > 7_000_000) {
+    return { valid: false, error: 'A valid generated image is required' };
   }
   if (!isString(brandName) || brandName.trim().length === 0) {
     return { valid: false, error: 'brandName is required' };
@@ -126,8 +142,9 @@ export function validateReviewRequest(body: unknown): ValidationResult<ReviewReq
   return {
     valid: true,
     data: {
-      revisedPrompt: revisedPrompt.trim(),
+      imageUrl,
       brandName: brandName.trim(),
+      description: isString(description) ? description.trim() : undefined,
     },
   };
 }

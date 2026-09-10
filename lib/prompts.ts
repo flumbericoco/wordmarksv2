@@ -122,6 +122,50 @@ The typography must feel timeless, premium, and instantly memorable after one gl
   return prompt;
 }
 
+export function buildIdentityLogoPrompt(
+  data: WizardData,
+  options?: { variationSeed?: string; improvementNotes?: string[]; research?: string },
+): string {
+  const layout = data.layout || 'icon-word';
+  const notes = options?.improvementNotes?.length
+    ? `\nREVIEW IMPROVEMENTS:\n- ${options.improvementNotes.join('\n- ')}`
+    : '';
+  return `Design one original, production-ready brand identity logo for "${data.brandName}".
+
+BRAND BRIEF: ${data.description || 'A modern brand that needs a distinctive, trustworthy identity.'}
+STYLE: ${data.style || 'modern, confident, timeless'}
+COLOR DIRECTION: ${data.colorPreference || 'a restrained professional palette with one accent color'}
+COMPOSITION: ${layout}. Unless the user explicitly selected a pure wordmark, create a distinctive abstract symbol plus a custom wordmark. The symbol must have a clear idea derived from the brand name, initials, purpose, or motion—not a generic stock icon.
+VARIATION KEY: ${options?.variationSeed || 'initial-concept'}
+${options?.research ? `STRATEGIC CONTEXT: ${options.research.slice(0, 1800)}` : ''}${notes}
+
+ART DIRECTION:
+- Deliver a coherent symbol + wordmark lockup comparable to a polished SaaS identity presentation.
+- Spell "${data.brandName}" exactly once and keep it immediately readable.
+- Build the symbol from simple geometric vector shapes with a memorable silhouette and meaningful negative space.
+- Use consistent optical weight, spacing, corner language, and alignment between symbol and lettering.
+- Maximum three flat colors. Avoid mockups, photos, gradients unless subtle and essential, shadows, bevels, 3D, mascots, decorative clutter, taglines, and extra text.
+- Transparent artboard: do not draw a full-canvas background rectangle.
+- Make it work at favicon size and in monochrome.
+- Create a genuinely different concept for every variation key; do not merely recolor the previous idea.
+- Return only the finished logo artwork, centered with generous clear space.`;
+}
+
+export function getVisualQualityReviewPrompt(svgMarkup: string, brandName: string, brief?: string): string {
+  return `Act as a strict senior identity designer. Review the actual generated SVG artwork below—not its generation prompt.
+
+BRAND: ${brandName}
+BRIEF: ${brief || 'Not provided'}
+SVG ARTWORK:\n${svgMarkup.slice(0, 24000)}
+
+First verify the exact brand spelling, then evaluate simplicity, memorability, small-size scalability, authority, originality, timelessness, and overall professional finish. Penalize generic symbols, weak alignment, accidental clipping, illegible text, excessive detail, and mismatch with the brief.
+
+Return ONLY valid JSON:
+{"overall":7.5,"scores":{"simplicity":8,"memorability":7,"scalability":8,"authority":7,"cleverness":7,"timelessness":8,"billionDollarFeel":7},"feedback":"Concise evidence-based critique of the visible artwork.","suggestions":["Specific visual improvement 1","Specific visual improvement 2","Specific visual improvement 3"],"approved":false}
+
+Use numeric scores from 1 to 10. approved is true only when overall is at least 9 and no spelling or legibility problem exists.`;
+}
+
 // ─── Quality Review Prompt ─────────────────────────────
 
 export function getQualityReviewPrompt(revisedPrompt: string, brandName: string): string {

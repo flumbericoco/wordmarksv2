@@ -17,7 +17,7 @@ interface JsonRpcRequest {
 
 const TOOL = {
   name: 'generate_wordmark_logo',
-  description: 'Generate a polished typography-first wordmark logo for a brand.',
+  description: 'Generate a polished brand identity logo with a distinctive symbol and readable wordmark.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -174,7 +174,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const data = payload.data as Record<string, unknown>;
     const image = svgContent(data.imageUrl);
     const summary = {
-      revisedPrompt: data.revisedPrompt,
+      status: 'Logo generated successfully',
+      generationId: data.generationId,
       ...(image ? {} : { imageUrl: data.imageUrl }),
     };
     return jsonRpc(rpc.id, {

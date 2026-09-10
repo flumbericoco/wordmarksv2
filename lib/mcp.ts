@@ -7,16 +7,16 @@
 
 export const WORDMARKS_LOGO_TOOL = {
   name: 'generate_wordmark_logo',
-  description: `Generate a premium typography-first wordmark logo for any brand.
+  description: `Generate a polished brand identity logo for any brand.
 
-This tool creates high-quality logos using AI. The logo is a wordmark — the brand name itself IS the logo with intelligent letterform modifications, negative space, and geometric precision.
+This tool creates a distinctive visual symbol paired with a readable custom wordmark, or a pure wordmark when explicitly requested.
 
 The tool follows a full pipeline:
 1. Analyzes the brand name and industry
 2. Applies the requested style, color, and layout
 3. Generates the logo using DALL-E 3
 4. Reviews quality (scores 1-10 on simplicity, memorability, scalability, authority, cleverness, timelessness, and "billion dollar feel")
-5. Returns the logo URL, quality scores, and the generation prompt
+5. Returns the finished logo without exposing internal generation instructions
 
 Style options: minimal, bold, elegant, modern, editorial, playful, classic, avantgarde
 Color options: monochrome, navy, slate, blue, green, purple, warm, red

@@ -5,7 +5,6 @@ import { QualityScore } from '@/lib/types';
 
 interface LogoResultViewProps {
   imageUrl: string;
-  revisedPrompt: string;
   qualityReview: QualityScore | null;
   brandName: string;
   iteration: number;
@@ -14,7 +13,7 @@ interface LogoResultViewProps {
   onRegenerate: () => void;
   onReview: () => void;
   onIterate: () => void;
-  onDownload: () => void;
+  onDownload: (format: 'svg' | 'png') => void;
   onNewLogo: () => void;
 }
 
@@ -33,7 +32,6 @@ function ScoreBar({ label, score }: { label: string; score: number }) {
 
 export default function LogoResultView({
   imageUrl,
-  revisedPrompt,
   qualityReview,
   brandName,
   iteration,
@@ -69,14 +67,16 @@ export default function LogoResultView({
               onClick={onNewLogo}
               className="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-medium text-zinc-400 hover:bg-white/5 hover:text-white transition-colors"
             >
-              + New Logo
+              Edit brief
             </button>
-            <button
-              onClick={onDownload}
-              className="rounded-lg bg-green-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-green-500 transition-colors"
-            >
-              ↓ Download {imageUrl.startsWith('data:image/svg+xml') ? 'SVG' : 'PNG'}
-            </button>
+            {imageUrl.startsWith('data:image/svg+xml') ? (
+              <>
+                <button onClick={() => onDownload('svg')} className="rounded-lg border border-white/15 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10">Download SVG</button>
+                <button onClick={() => onDownload('png')} className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-500">Download PNG</button>
+              </>
+            ) : (
+              <button onClick={() => onDownload('png')} className="rounded-lg bg-green-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-green-500">Download PNG</button>
+            )}
           </div>
         </div>
         <div className={`p-8 ${previewClass}`}>
@@ -177,13 +177,6 @@ export default function LogoResultView({
         </div>
       )}
 
-      {/* Prompt */}
-      {!isGenerating && revisedPrompt && (
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <h4 className="text-xs font-medium text-zinc-500 mb-1">Generated Prompt</h4>
-          <p className="text-xs text-zinc-600 leading-relaxed">{revisedPrompt}</p>
-        </div>
-      )}
     </div>
   );
 }

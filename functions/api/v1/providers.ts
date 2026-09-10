@@ -203,6 +203,44 @@ export async function chatCompletionServer(
   throw lastError || new Error('Provider request failed after retries');
 }
 
+export async function chatCompletionWithImageServer(
+  systemPrompt: string,
+  userPrompt: string,
+  imageUrl: string,
+  apiKey: string,
+  baseUrl: string,
+  model: string,
+): Promise<string> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 60_000);
+  try {
+    const response = await fetch(providerEndpoint(baseUrl, 'chat/completions'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: [
+            { type: 'text', text: userPrompt },
+            { type: 'image_url', image_url: { url: imageUrl } },
+          ] },
+        ],
+        temperature: 0.2,
+      }),
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({})) as { error?: { message?: string } };
+      throw new Error(body.error?.message || `Vision review failed (${response.status})`);
+    }
+    const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+    return data.choices?.[0]?.message?.content || '';
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Make an image generation request
  */
