@@ -287,7 +287,7 @@ export default function Home() {
                   <span className="relative mt-4 block font-serif font-normal italic tracking-[-0.06em] text-[#d94324]">name iconic.</span>
                 </h1>
                 <p className="mt-6 max-w-xl text-base leading-7 text-black/60 sm:text-lg">
-                  Distinctive, typography-first logos shaped by strategy and refined by AI—ready in minutes, not weeks.
+                  Complete brand logos shaped by strategy and refined by AI—ready in minutes, not weeks.
                 </p>
                 <div className="mt-6 flex flex-wrap items-center gap-5">
                   <a href="#create" className="group inline-flex items-center gap-8 rounded-full bg-[#171714] py-4 pl-6 pr-4 text-sm font-bold text-white transition-transform hover:-translate-y-1">
@@ -405,7 +405,7 @@ export default function Home() {
                   </div>
                   <div className="py-6 font-mono text-xs leading-7 sm:text-sm">
                     <p className="text-white/35"># Remote MCP endpoint</p>
-                    <p className="break-all text-[#c6ff4a]">https://wordmarks-v2-dz1.pages.dev/mcp</p>
+                    <p className="break-all text-[#c6ff4a]">https://wordmarks.net/mcp</p>
                     <p className="mt-4 text-white/35"># Available tool</p>
                     <p className="text-white">generate_wordmark_logo</p>
                     <p className="mt-4 text-white/35"># Then just ask your agent</p>

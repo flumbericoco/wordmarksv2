@@ -13,12 +13,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "wordmarks.net — AI Typography Logo Maker",
-  description: "Generate premium, typography-first wordmark logos with AI. Guided wizard → quality review → iteration. Powered by GPT-4o & DALL-E 3.",
+  title: "wordmarks.net — AI Brand Logo Maker",
+  description: "Generate complete, professional brand logos with AI. Guided brief, visual quality review, and meaningful iteration.",
   keywords: ["logo maker", "wordmark", "typography logo", "AI logo", "brand identity", "logo generator"],
   openGraph: {
-    title: "wordmarks.net — AI Typography Logo Maker",
-    description: "Generate premium wordmark logos with AI. Guided wizard, quality review, infinite iteration.",
+    title: "wordmarks.net — AI Brand Logo Maker",
+    description: "Generate complete professional logos with a distinctive symbol and readable wordmark.",
     url: "https://wordmarks.net",
     siteName: "wordmarks.net",
     type: "website",

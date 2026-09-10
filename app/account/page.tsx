@@ -268,7 +268,7 @@ export default function AccountPage() {
               <div key={key.id} className="flex items-center justify-between gap-4 py-4"><div><p className="font-bold">{key.name}</p><code className="text-xs text-black/45">{key.key_prefix}</code><p className="mt-1 text-[11px] text-black/40">{key.last_used_at ? `Last used ${new Date(`${key.last_used_at}Z`).toLocaleString()}` : 'Never used'}</p></div>{key.revoked_at ? <span className="text-xs text-red-600">Revoked</span> : <button onClick={() => revokeKey(key.id)} className="text-xs font-bold text-red-700">Revoke</button>}</div>
             ))}
           </div>
-          <div className="mt-6 rounded-2xl bg-[#171714] p-5 text-xs leading-6 text-white/65"><code>Authorization: Bearer wm_live_your_key</code><br /><code>https://wordmarks-v2-dz1.pages.dev/mcp</code></div>
+          <div className="mt-6 rounded-2xl bg-[#171714] p-5 text-xs leading-6 text-white/65"><code>Authorization: Bearer wm_live_your_key</code><br /><code>https://wordmarks.net/mcp</code></div>
         </section>
         <section className="mt-6 rounded-[2rem] border border-red-200 bg-red-50 p-7">
           <p className="text-xs font-black uppercase tracking-[0.18em] text-red-700">Danger zone</p>

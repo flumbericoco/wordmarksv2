@@ -4,7 +4,7 @@ const agentPrompt = `Use generate_wordmark_logo to create a modern horizontal wo
 "Kopi Nusantara", a premium Indonesian coffee brand. Use dark brown and gold.
 Save the result as kopi-nusantara.svg.`;
 
-const remoteConfig = `MCP URL: https://wordmarks-v2-dz1.pages.dev/mcp
+const remoteConfig = `MCP URL: https://wordmarks.net/mcp
 Transport: Streamable HTTP
 Header: Authorization: Bearer YOUR_WORDMARKS_TOKEN`;
 
@@ -12,7 +12,7 @@ const bridgeConfig = `{
   "type": "local",
   "command": [
     "npx.cmd", "-y", "mcp-remote",
-    "https://wordmarks-v2-dz1.pages.dev/mcp",
+    "https://wordmarks.net/mcp",
     "--header", "Authorization: Bearer \${WORDMARKS_TOKEN}"
   ],
   "environment": { "WORDMARKS_TOKEN": "YOUR_TOKEN" },

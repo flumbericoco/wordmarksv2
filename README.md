@@ -74,7 +74,7 @@ Canonical API hostname: `https://api.wordmarks.net`
 The production MCP endpoint is:
 
 ```text
-https://wordmarks-v2-dz1.pages.dev/mcp
+https://wordmarks.net/mcp
 ```
 
 Set a dedicated token once in Cloudflare (do not commit the value):
@@ -86,7 +86,7 @@ npx wrangler pages secret put WORDMARKS_MCP_TOKEN --project-name=wordmarks-v2
 Connect Claude Code:
 
 ```bash
-claude mcp add --transport http wordmarks https://wordmarks-v2-dz1.pages.dev/mcp \
+claude mcp add --transport http wordmarks https://wordmarks.net/mcp \
   --header "Authorization: Bearer YOUR_WORDMARKS_MCP_TOKEN"
 ```
 

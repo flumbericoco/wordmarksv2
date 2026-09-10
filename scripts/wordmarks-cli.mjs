@@ -3,7 +3,7 @@ import { stdin as input, stdout as output } from 'node:process';
 import { writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-const MCP_URL = process.env.WORDMARKS_MCP_URL || 'https://wordmarks-v2-dz1.pages.dev/mcp';
+const MCP_URL = process.env.WORDMARKS_MCP_URL || 'https://wordmarks.net/mcp';
 const token = process.env.WORDMARKS_MCP_TOKEN;
 
 if (!token) {

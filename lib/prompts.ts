@@ -3,17 +3,17 @@ import { WizardData } from './types';
 // ─── Research + Recommend Prompt ───────────────────────
 
 export function buildResearchPrompt(brandName: string, description: string): string {
-  return `You are an elite typography-focused brand strategist and creative director specializing in wordmark logos.
+  return `You are an elite brand identity strategist and creative director specializing in memorable logo systems.
 
 Brand Name: "${brandName}"
 Description: ${description || 'No description provided'}
 
-We are wordmarks.net — a specialist in typography-first wordmark logos. Our entire craft is about making the brand name itself the logo through intelligent letterform design.
+We are wordmarks.net — an AI identity studio that combines a distinctive brand symbol with a clear, custom wordmark.
 
 TASK:
 1. Research and identify the industry/category this brand belongs to
-2. Analyze the brand name's LETTERFORMS — what do the specific letters lend themselves to?
-3. Recommend TYPOGRAPHIC sub-styles (not generic design styles) that would work best
+2. Identify meaningful visual concepts for a distinctive symbol derived from the brand name, purpose, or category
+3. Recommend symbol and typographic styles that work as one coherent identity
 4. Recommend color palettes that complement the typography
 5. Recommend layout type that works for this specific letter combination
 6. Describe the brand personality in 3-5 words
