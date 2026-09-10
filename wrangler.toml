@@ -7,12 +7,12 @@ pages_build_output_dir = "out"
 [[d1_databases]]
 binding = "DB"
 database_name = "wordmarks-db"
-database_id = "0b243319-821b-42a0-b0d0-36d27dac4a61"
+database_id = "4960d370-b0cd-42ba-aad6-fd400cc21a90"
 
 # ─── KV Namespace (rate limiting + caching) ─────────────
 [[kv_namespaces]]
 binding = "WORDMARKS_KV"
-id = "bbffa8e810ee4ec1a25f61de6fd840ec"
+id = "29de00d7b63e43b1adb2fdae89cc6a45"
 
 # ─── R2 Object Storage ───────────────────────────────────
 # R2 bindings are intentionally omitted for the free deployment without R2.
