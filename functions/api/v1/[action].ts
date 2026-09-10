@@ -129,6 +129,21 @@ function sanitizeGeneratedSvg(raw: string): string {
   return svg;
 }
 
+function validateLogoArtwork(svg: string, brandName: string): void {
+  const textElements = svg.match(/<text\b/gi)?.length || 0;
+  const graphicElements = svg.match(/<(?:path|polygon|circle|ellipse)\b/gi)?.length || 0;
+  const isPoster = /<(?:filter|pattern)\b/i.test(svg)
+    || /<rect\b[^>]*width=["'](?:100%|1200)["'][^>]*height=["'](?:100%|500|800)["']/i.test(svg);
+  const visibleText = [...svg.matchAll(/<text\b[^>]*>([\s\S]*?)<\/text>/gi)]
+    .map((match) => match[1].replace(/<[^>]+>/g, '').replace(/\s+/g, '').toLocaleLowerCase())
+    .join('');
+  const normalizedBrand = brandName.replace(/\s+/g, '').toLocaleLowerCase();
+
+  if (isPoster || textElements > 2 || graphicElements < 1 || !visibleText.includes(normalizedBrand)) {
+    throw new Error('Generated artwork was not a clean symbol-and-wordmark logo');
+  }
+}
+
 async function generateSvgWordmark(
   prompt: string,
   brandName: string,
@@ -137,10 +152,10 @@ async function generateSvgWordmark(
   let lastError: Error | null = null;
   for (let attempt = 0; attempt < 3; attempt++) {
     const correction = attempt > 0
-      ? ' Previous output failed safety validation. Use only svg, g, path, rect, circle, line, polygon and text elements with inline presentation attributes. Never use style, script, href, foreignObject, embedded content, CSS imports, event handlers, or external URLs. Fragment references such as url(#gradient) are allowed.'
+      ? ' Previous output failed logo-quality validation. Return a simpler flat logo only: one compact symbol directly beside one contiguous brand-name wordmark. Remove all backgrounds, frames, grids, taglines, labels, metadata, slogans, glow, filters, patterns and decorative presentation elements. Never separate parts of the brand name with distant absolute x positions.'
       : '';
     const content = await chatCompletionServer(
-      'You are a world-class identity designer and SVG artist. Create a complete logo system mark, not a text treatment. Return one valid self-contained SVG only, with a 1200x800 viewBox and transparent artboard. Use simple paths, geometric shapes, and readable text with system font fallbacks. Include a distinctive symbol and a carefully spaced wordmark unless the brief explicitly requests wordmark-only. Do not use markdown, style tags, scripts, event handlers, href, external URLs, external fonts, embedded content, or foreignObject.',
+      `You are a world-class identity designer and SVG artist. Create a compact production logo, never a poster, banner, mockup, or presentation board. Return one valid self-contained SVG only with viewBox="0 0 1200 500" and a transparent artboard. Use one distinctive flat vector symbol directly beside one readable wordmark spelling "${brandName}" exactly. Keep the symbol gap about one letter-width. Keep the entire brand name contiguous using one text element or adjacent tspans without independent x positions. Use at most two text elements total. No background, frame, grid, tagline, slogan, metadata, labels, tiny text, glow, shadow, filter, pattern, decorative scene, or excessive whitespace. Use simple geometric shapes, at most three flat colors, and system font fallbacks. Center the compact lockup with 8–12% clear space. Do not use markdown, style tags, scripts, event handlers, href, external URLs, external fonts, embedded content, or foreignObject.`,
       `${prompt}${correction}`,
       provider.apiKey,
       provider.baseUrl,
@@ -149,6 +164,7 @@ async function generateSvgWordmark(
     );
     try {
       const svg = sanitizeGeneratedSvg(content);
+      validateLogoArtwork(svg, brandName);
       return { url: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}` };
     } catch (error) {
       lastError = error instanceof Error ? error : new Error('Invalid SVG');

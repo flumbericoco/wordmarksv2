@@ -140,11 +140,11 @@ VARIATION KEY: ${options?.variationSeed || 'initial-concept'}
 ${options?.research ? `STRATEGIC CONTEXT: ${options.research.slice(0, 1800)}` : ''}${notes}
 
 ART DIRECTION:
-- Deliver a coherent symbol + wordmark lockup comparable to a polished SaaS identity presentation.
+- Deliver a compact standalone symbol + wordmark lockup, never a poster, banner, mockup, or presentation board.
 - Spell "${data.brandName}" exactly once and keep it immediately readable.
 - Build the symbol from simple geometric vector shapes with a memorable silhouette and meaningful negative space.
-- Use consistent optical weight, spacing, corner language, and alignment between symbol and lettering.
-- Maximum three flat colors. Avoid mockups, photos, gradients unless subtle and essential, shadows, bevels, 3D, mascots, decorative clutter, taglines, and extra text.
+- Use consistent optical weight, spacing, corner language, and alignment. Keep the symbol-to-wordmark gap near one letter-width and every part of the brand name tightly contiguous.
+- Maximum three flat colors. No backgrounds, frames, grids, taglines, slogans, metadata, tiny labels, glow, filters, patterns, mockups, photos, shadows, bevels, 3D, mascots, or decorative clutter.
 - Transparent artboard: do not draw a full-canvas background rectangle.
 - Make it work at favicon size and in monochrome.
 - Create a genuinely different concept for every variation key; do not merely recolor the previous idea.
