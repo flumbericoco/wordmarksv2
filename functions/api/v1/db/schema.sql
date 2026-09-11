@@ -176,3 +176,4 @@ CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(user_id, stat
 CREATE INDEX IF NOT EXISTS idx_payment_events_status ON payment_events(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_payment_transactions_user ON payment_transactions(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_payment_transactions_intent ON payment_transactions(stripe_payment_intent_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_payment_transactions_invoice ON payment_transactions(stripe_invoice_id) WHERE stripe_invoice_id IS NOT NULL AND stripe_invoice_id <> '';

@@ -125,23 +125,17 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       return jsonRpcError(rpc.id, -32602, 'Tool arguments must be an object');
     }
 
-    const reserved = await env.DB.prepare(
-      "UPDATE users SET credits = credits - 1, updated_at = datetime('now') WHERE id = ? AND credits > 0"
-    ).bind(apiUser.id).run();
-    if (!reserved.meta.changes) {
+    const spendReference = `mcp-generation:${crypto.randomUUID()}`;
+    const reservation = await env.DB.batch([
+      env.DB.prepare('INSERT INTO credit_ledger(id,user_id,amount,reason,reference) SELECT ?,?,-1,?,? WHERE EXISTS(SELECT 1 FROM users WHERE id=? AND credits>0)')
+        .bind(crypto.randomUUID(), apiUser.id, 'logo_generation', spendReference, apiUser.id),
+      env.DB.prepare("UPDATE users SET credits=credits-1, updated_at=datetime('now') WHERE id=? AND credits>0").bind(apiUser.id),
+    ]);
+    if (!reservation[1].meta.changes) {
       return jsonRpc(rpc.id, {
         content: [{ type: 'text', text: 'Insufficient credits. Top up your Wordmarks account.' }],
         isError: true,
       });
-    }
-
-    const spendReference = `mcp-generation:${crypto.randomUUID()}`;
-    try {
-      await env.DB.prepare('INSERT INTO credit_ledger (id, user_id, amount, reason, reference) VALUES (?, ?, -1, ?, ?)')
-        .bind(crypto.randomUUID(), apiUser.id, 'logo_generation', spendReference).run();
-    } catch (error) {
-      await env.DB.prepare("UPDATE users SET credits = credits + 1, updated_at = datetime('now') WHERE id = ?").bind(apiUser.id).run();
-      throw error;
     }
 
     let payload: Record<string, unknown>;

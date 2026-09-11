@@ -84,6 +84,7 @@ export default function Home() {
         research: researchText,
         logo: result,
         iteration: nextIteration,
+        savedAt: Date.now(),
       }));
     } catch {
       // A large data URL can exceed browser storage. The generated logo still works in this tab.
@@ -107,7 +108,9 @@ export default function Home() {
           research?: string;
           logo?: LogoResult;
           iteration?: number;
+          savedAt?: number;
         };
+        if (!parsed.savedAt || Date.now() - parsed.savedAt > 24 * 60 * 60_000) return sessionStorage.removeItem('wordmarks:last-result');
         if (!parsed.data || !parsed.logo?.imageUrl) return;
         setWizardData(parsed.data);
         setResearch(parsed.research || '');

@@ -18,7 +18,8 @@ export default function StepInput({ brandName, description, onNext }: StepInputP
   useEffect(() => {
     const timer = window.setTimeout(() => {
       try {
-        const saved = JSON.parse(localStorage.getItem('wordmarks:draft') || '{}') as { name?: string; description?: string };
+        const saved = JSON.parse(localStorage.getItem('wordmarks:draft') || '{}') as { name?: string; description?: string; savedAt?: number };
+        if (!saved.savedAt || Date.now() - saved.savedAt > 24 * 60 * 60_000) return localStorage.removeItem('wordmarks:draft');
         if (!brandName && saved.name) setName(saved.name);
         if (!description && saved.description) setDesc(saved.description);
       } catch { /* Ignore malformed browser storage. */ }
@@ -29,7 +30,7 @@ export default function StepInput({ brandName, description, onNext }: StepInputP
 
   useEffect(() => {
     if (!draftLoaded.current) return;
-    localStorage.setItem('wordmarks:draft', JSON.stringify({ name, description: desc }));
+    localStorage.setItem('wordmarks:draft', JSON.stringify({ name, description: desc, savedAt: Date.now() }));
   }, [name, desc]);
 
   return (

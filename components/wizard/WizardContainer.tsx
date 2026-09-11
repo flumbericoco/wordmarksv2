@@ -25,7 +25,7 @@ export default function WizardContainer({ onComplete }: WizardContainerProps) {
   const [error, setError] = useState<string | null>(null);
 
   const handleInputComplete = async (name: string, desc: string) => {
-    localStorage.setItem('wordmarks:draft', JSON.stringify({ name, description: desc }));
+    localStorage.setItem('wordmarks:draft', JSON.stringify({ name, description: desc, savedAt: Date.now() }));
     const session = await fetch('/api/v1/account/me', { credentials: 'same-origin' });
     if (!session.ok) {
       window.location.assign('/account?next=%2F%23create');

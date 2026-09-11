@@ -1,5 +1,6 @@
 import { errorResponse, successResponse, UnauthorizedError, ValidationError } from '../../../lib/errors';
 import { authenticateRequest } from '../auth';
+import { isAllowedProvider } from '../providers';
 
 interface Env {
   DB: D1Database;
@@ -18,7 +19,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const body: { baseUrl?: string; textModel?: string } = await request.json<{ baseUrl?: string; textModel?: string }>().catch(() => ({}));
     const baseUrl = String(body.baseUrl || '').replace(/\/$/, '');
     const textModel = String(body.textModel || '').trim();
-    if (!baseUrl.startsWith('https://') || !textModel) throw new ValidationError('A valid HTTPS base URL and text model are required');
+    if (!baseUrl.startsWith('https://') || !textModel || !isAllowedProvider(baseUrl)) throw new ValidationError('Provider URL is not in the approved provider allowlist');
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15_000);
@@ -29,6 +30,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         signal: controller.signal,
         headers: { Authorization: `Bearer ${env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ model: textModel, messages: [{ role: 'user', content: 'Reply with OK.' }], max_tokens: 8 }),
+        redirect: 'error',
       });
     } finally {
       clearTimeout(timer);

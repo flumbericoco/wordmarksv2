@@ -146,6 +146,8 @@ export default function AccountPage() {
     setUser(null);
     setKeys([]);
     setNewToken('');
+    localStorage.removeItem('wordmarks:draft');
+    sessionStorage.removeItem('wordmarks:last-result');
   }
 
   async function checkout(plan: string) {

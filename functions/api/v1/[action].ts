@@ -399,6 +399,12 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       throw new ValidationError('Invalid JSON body');
     }
 
+    const internalMcpCall = equal(extractToken(request), env.WORDMARKS_MCP_TOKEN);
+    const user = internalMcpCall ? null : await getUserSession(request, env.DB);
+    if (!user && !(internalMcpCall && action === 'generate-logo')) {
+      return Response.json({ error: 'Authentication required', requestId }, { status: 401 });
+    }
+
     // Get active provider
     const provider = await getActiveProvider(env.DB, env);
     if (!provider || !provider.apiKey) {
@@ -423,45 +429,31 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       case 'generate-logo': {
         const validated = validateGenerateRequest(body);
         if (!validated.valid) throw new ValidationError(validated.error);
-        const internalMcpCall = equal(extractToken(request), env.WORDMARKS_MCP_TOKEN);
-        const user = internalMcpCall ? null : await getUserSession(request, env.DB);
-        if (!internalMcpCall && !user) {
-          return Response.json({ error: 'Sign in and add credits before generating a logo', requestId }, { status: 401 });
-        }
+        const spendReference = `web-generation:${requestId}`;
+        let creditReserved = false;
         if (user) {
-          const balance = await env.DB.prepare('SELECT credits FROM users WHERE id=?').bind(user.id).first<{ credits: number }>();
-          if (!balance || balance.credits < 1) {
-            return Response.json({ error: 'Insufficient credits', requestId }, { status: 402 });
-          }
+          const reservation = await env.DB.batch([
+            env.DB.prepare('INSERT INTO credit_ledger(id,user_id,amount,reason,reference) SELECT ?,?,-1,?,? WHERE EXISTS(SELECT 1 FROM users WHERE id=? AND credits>0)')
+              .bind(crypto.randomUUID(), user.id, 'logo_generation', spendReference, user.id),
+            env.DB.prepare("UPDATE users SET credits=credits-1, updated_at=datetime('now') WHERE id=? AND credits>0").bind(user.id),
+          ]);
+          if (!reservation[1].meta.changes) return Response.json({ error: 'Insufficient credits', requestId }, { status: 402 });
+          creditReserved = true;
         }
         try {
           const ownerId = user?.id || (internalMcpCall ? request.headers.get('X-Wordmarks-User-ID') || undefined : undefined);
           data = await handleGenerate(validated.data, provider, env.DB, env.GENERATED_BUCKET, requestId, waitUntil, ownerId);
-          if (user) {
-            const debit = await env.DB.prepare(
-              "UPDATE users SET credits=credits-1, updated_at=datetime('now') WHERE id=? AND credits>0"
-            ).bind(user.id).run();
-            if (!debit.meta.changes) {
-              const generated = data as { generationId?: string };
-              if (generated.generationId) {
-                await env.DB.prepare(
-                  "UPDATE generation_jobs SET status='failed', result_url=NULL, error='Credit unavailable after concurrent generation' WHERE id=?"
-                ).bind(generated.generationId).run();
-              }
-              return Response.json({ error: 'Insufficient credits', requestId }, { status: 402 });
-            }
-            try {
-              await env.DB.prepare(
-                'INSERT INTO credit_ledger (id,user_id,amount,reason,reference) VALUES (?,?, -1,?,?)'
-              ).bind(crypto.randomUUID(), user.id, 'logo_generation', `web-generation:${requestId}`).run();
-            } catch (error) {
-              await env.DB.prepare("UPDATE users SET credits=credits+1, updated_at=datetime('now') WHERE id=?").bind(user.id).run();
-              throw error;
-            }
-          }
         } catch (error) {
-          const message = error instanceof Error ? error.message : 'Generation failed';
-          throw new ProviderError(`${message}. No credit was charged.`);
+          if (user && creditReserved) {
+            const refundReference = `refund:${spendReference}`;
+            const exists = await env.DB.prepare('SELECT id FROM credit_ledger WHERE reference=?').bind(refundReference).first();
+            if (!exists) await env.DB.batch([
+              env.DB.prepare("UPDATE users SET credits=credits+1, updated_at=datetime('now') WHERE id=?").bind(user.id),
+              env.DB.prepare('INSERT INTO credit_ledger(id,user_id,amount,reason,reference) VALUES(?,?,1,?,?)').bind(crypto.randomUUID(), user.id, 'generation_refund', refundReference),
+            ]);
+          }
+          console.error(JSON.stringify({ level: 'error', event: 'generation_failed', requestId, message: error instanceof Error ? error.message : String(error) }));
+          throw new ProviderError('Logo generation failed. Your credit was restored.');
         }
         break;
       }
@@ -487,11 +479,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return errorResponse(err, requestId);
     }
 
-    const providerMessage = err instanceof Error
-      ? err.message
-      : 'Unknown provider error';
+    console.error(JSON.stringify({ level: 'error', event: 'provider_request_failed', requestId, message: err instanceof Error ? err.message : String(err) }));
     return errorResponse(
-      new ProviderError(`PesatRouter request failed: ${providerMessage}`),
+      new ProviderError('AI provider request failed. Please try again.'),
       requestId
     );
   }

@@ -1,6 +1,7 @@
 import { authenticateRequest } from '../api/v1/auth';
 
 interface Env {
+  DB?: D1Database;
   ADMIN_PASSWORD?: string;
   WORDMARKS_MCP_TOKEN?: string;
 }

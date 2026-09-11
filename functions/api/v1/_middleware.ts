@@ -3,7 +3,7 @@
 
 import { authenticateRequest, type AuthContext } from './auth';
 import { checkRateLimit, rateLimitHeaders } from './rate-limit';
-import { UnauthorizedError, RateLimitError, errorResponse } from '../../lib/errors';
+import { ForbiddenError, UnauthorizedError, RateLimitError, errorResponse } from '../../lib/errors';
 import { getUserSession } from './user-auth';
 
 interface Env {
@@ -82,6 +82,16 @@ export const onRequest = async (context: MiddlewareContext): Promise<Response> =
     if (user) auth = { authenticated: true, isAdmin: false, actor: `user:${user.id}` };
   }
 
+  const unsafeMethod = !['GET', 'HEAD', 'OPTIONS'].includes(request.method);
+  const isStripeWebhookPath = functionPath.endsWith('/billing/webhook');
+  if (unsafeMethod && requestOrigin && !sameOrigin && !isStripeWebhookPath) {
+    return addHeaders(errorResponse(new ForbiddenError('Cross-origin request rejected'), requestId));
+  }
+  const contentLength = Number(request.headers.get('Content-Length') || 0);
+  if (contentLength > 8_000_000) {
+    return addHeaders(new Response(JSON.stringify({ ok: false, error: 'Request body too large', requestId }), { status: 413, headers: { 'Content-Type': 'application/json' } }));
+  }
+
   if (isAdminRoute && !auth.isAdmin) {
     return addHeaders(
       errorResponse(new UnauthorizedError('Admin authentication required'), requestId)
@@ -98,7 +108,7 @@ export const onRequest = async (context: MiddlewareContext): Promise<Response> =
 
   // Stripe authenticates webhook requests with its signature in the handler;
   // IP-based middleware throttling could drop legitimate event bursts.
-  const isStripeWebhook = functionPath.endsWith('/billing/webhook');
+  const isStripeWebhook = isStripeWebhookPath;
   const rlResult = isStripeWebhook
     ? { allowed: true, remaining: 1, limit: 1, resetAt: Date.now() + 60_000 }
     : await checkRateLimit(auth.actor, functionPath, env, tier);

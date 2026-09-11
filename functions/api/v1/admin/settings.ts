@@ -3,6 +3,7 @@
 import { successResponse, errorResponse, ValidationError, UnauthorizedError } from '../../../lib/errors';
 import { validateSettingsRequest, type SettingsRequest } from '../../../lib/validation';
 import { authenticateRequest } from '../auth';
+import { recordAudit } from '../audit';
 
 interface Env {
   DB: D1Database;
@@ -72,6 +73,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
       if (stmts.length > 0) {
         await env.DB.batch(stmts);
+        await recordAudit(env.DB, auth.actor, 'update_settings', 'settings', undefined, updates);
       }
 
       // Return updated settings

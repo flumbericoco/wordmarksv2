@@ -1,8 +1,11 @@
 import { getUserSession, hashPassword, randomToken, sessionCookie, sha256 } from '../user-auth';
+import { recordAudit } from '../audit';
 
-interface Env { DB: D1Database; RESEND_API_KEY?: string; EMAIL_FROM?: string }
+interface Env { DB: D1Database; RESEND_API_KEY?: string; EMAIL_FROM?: string; STRIPE_SECRET_KEY?: string }
 
 const json = (data: unknown, status = 200, headers?: HeadersInit) => Response.json(data, { status, headers });
+const MAX_PASSWORD_LENGTH = 128;
+const blockedEmailDomains = new Set(['mailinator.com', 'guerrillamail.com', '10minutemail.com', 'tempmail.com', 'yopmail.com']);
 
 async function bodyOf(request: Request): Promise<Record<string, unknown>> {
   try { return await request.json<Record<string, unknown>>(); }
@@ -26,6 +29,7 @@ export const onRequest: PagesFunction<Env> = async ({ request, env, params }) =>
   if (action === 'request-reset' && request.method === 'POST') {
     const body = await bodyOf(request);
     const email = String(body.email || '').trim().toLowerCase();
+    if (email.length > 254) return json({ ok: true, message: 'If the account exists, a reset link has been sent.' });
     const found = await env.DB.prepare('SELECT id FROM users WHERE email=?').bind(email).first<{ id: string }>();
     if (found && env.RESEND_API_KEY) {
       const token = randomToken();
@@ -41,7 +45,8 @@ export const onRequest: PagesFunction<Env> = async ({ request, env, params }) =>
     const body = await bodyOf(request);
     const token = String(body.token || '');
     const password = String(body.password || '');
-    if (password.length < 10) return json({ error: 'Password must be at least 10 characters' }, 400);
+    if (token.length < 32 || token.length > 512) return json({ error: 'Reset link is invalid or expired' }, 400);
+    if (password.length < 10 || password.length > MAX_PASSWORD_LENGTH) return json({ error: 'Password must be 10 to 128 characters' }, 400);
     const found = await env.DB.prepare("SELECT id,user_id FROM auth_tokens WHERE token_hash=? AND purpose='password_reset' AND used_at IS NULL AND expires_at>datetime('now')")
       .bind(await sha256(token)).first<{ id: string; user_id: string }>();
     if (!found) return json({ error: 'Reset link is invalid or expired' }, 400);
@@ -58,8 +63,10 @@ export const onRequest: PagesFunction<Env> = async ({ request, env, params }) =>
     const body = await bodyOf(request);
     const email = String(body.email || '').trim().toLowerCase();
     const password = String(body.password || '');
+    if (email.length > 254) return json({ error: 'Valid email is required' }, 400);
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: 'Valid email is required' }, 400);
-    if (password.length < 10) return json({ error: 'Password must be at least 10 characters' }, 400);
+    if (password.length < 10 || password.length > MAX_PASSWORD_LENGTH) return json({ error: 'Password must be 10 to 128 characters' }, 400);
+    if (blockedEmailDomains.has(email.split('@')[1] || '')) return json({ error: 'Disposable email addresses are not allowed' }, 400);
     const exists = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first();
     if (exists) return json({ error: 'Email is already registered' }, 409);
 
@@ -69,18 +76,17 @@ export const onRequest: PagesFunction<Env> = async ({ request, env, params }) =>
     const token = randomToken();
     const tokenHash = await sha256(token);
     await env.DB.batch([
-      env.DB.prepare('INSERT INTO users (id, email, password_hash, password_salt, credits) VALUES (?, ?, ?, ?, 10)').bind(id, email, passwordHash, salt),
+      env.DB.prepare('INSERT INTO users (id, email, password_hash, password_salt, credits) VALUES (?, ?, ?, ?, 0)').bind(id, email, passwordHash, salt),
       env.DB.prepare("INSERT INTO user_sessions (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, datetime('now', '+30 days'))").bind(crypto.randomUUID(), id, tokenHash),
-      env.DB.prepare("INSERT INTO credit_ledger (id,user_id,amount,reason,reference) VALUES (?,?,10,'signup_bonus',?)")
-        .bind(crypto.randomUUID(), id, `signup:${id}`),
     ]);
-    return json({ ok: true, user: { id, email, plan: 'none', credits: 10 } }, 201, { 'Set-Cookie': sessionCookie(token) });
+    return json({ ok: true, user: { id, email, plan: 'none', credits: 0 } }, 201, { 'Set-Cookie': sessionCookie(token) });
   }
 
   if (action === 'login' && request.method === 'POST') {
     const body = await bodyOf(request);
     const email = String(body.email || '').trim().toLowerCase();
     const password = String(body.password || '');
+    if (password.length > MAX_PASSWORD_LENGTH || email.length > 254) return json({ error: 'Invalid email or password' }, 401);
     const user = await env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(email).first<Record<string, unknown>>();
     if (!user || await hashPassword(password, String(user.password_salt)) !== String(user.password_hash)) {
       return json({ error: 'Invalid email or password' }, 401);
@@ -113,18 +119,23 @@ export const onRequest: PagesFunction<Env> = async ({ request, env, params }) =>
   if (action === 'create-key' && request.method === 'POST') {
     const body = await bodyOf(request);
     const name = String(body.name || 'My AI agent').trim().slice(0, 60);
+    const activeKeys = await env.DB.prepare('SELECT COUNT(*) AS count FROM api_keys WHERE user_id=? AND revoked_at IS NULL').bind(user.id).first<{ count: number }>();
+    if (Number(activeKeys?.count || 0) >= 10) return json({ error: 'Maximum of 10 active API keys reached' }, 409);
     const rawKey = `wm_live_${randomToken(24)}`;
     const prefix = `${rawKey.slice(0, 15)}...`;
     const id = crypto.randomUUID();
     await env.DB.prepare('INSERT INTO api_keys (id, user_id, name, key_prefix, key_hash) VALUES (?, ?, ?, ?, ?)')
       .bind(id, user.id, name, prefix, await sha256(rawKey)).run();
+    await recordAudit(env.DB, `user:${user.id}`, 'create_api_key', 'api_key', id, { name, prefix });
     return json({ ok: true, key: { id, name, prefix, token: rawKey } }, 201);
   }
 
   if (action === 'revoke-key' && request.method === 'POST') {
     const body = await bodyOf(request);
+    const keyId = String(body.id || '');
     await env.DB.prepare("UPDATE api_keys SET revoked_at = datetime('now') WHERE id = ? AND user_id = ? AND revoked_at IS NULL")
-      .bind(String(body.id || ''), user.id).run();
+      .bind(keyId, user.id).run();
+    await recordAudit(env.DB, `user:${user.id}`, 'revoke_api_key', 'api_key', keyId);
     return json({ ok: true });
   }
 
@@ -150,9 +161,22 @@ export const onRequest: PagesFunction<Env> = async ({ request, env, params }) =>
     if (!stored || await hashPassword(password, stored.password_salt) !== stored.password_hash) {
       return json({ error: 'Password is incorrect' }, 403);
     }
-    const active = await env.DB.prepare("SELECT id FROM subscriptions WHERE user_id=? AND status IN ('active','trialing','past_due') LIMIT 1")
+    const active = await env.DB.prepare("SELECT stripe_subscription_id FROM subscriptions WHERE user_id=? AND status IN ('active','trialing','past_due') LIMIT 1")
       .bind(user.id).first();
     if (active) return json({ error: 'Cancel the active subscription in Billing before deleting your account.' }, 409);
+    if (user.stripeCustomerId) {
+      if (!env.STRIPE_SECRET_KEY) return json({ error: 'Unable to verify billing status. Try again later.' }, 503);
+      const stripe = await fetch(`https://api.stripe.com/v1/subscriptions?customer=${encodeURIComponent(user.stripeCustomerId)}&status=all&limit=20`, {
+        headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY}` },
+      });
+      if (!stripe.ok) return json({ error: 'Unable to verify billing status. Try again later.' }, 503);
+      const payload = await stripe.json<{ data?: Array<{ status?: string }> }>();
+      if (payload.data?.some((subscription) => ['active', 'trialing', 'past_due', 'unpaid'].includes(String(subscription.status)))) {
+        return json({ error: 'Cancel the active Stripe subscription before deleting your account.' }, 409);
+      }
+    }
+    await env.DB.prepare("INSERT INTO audit_events(id,event_type,actor,action,resource_type,resource_id,details) VALUES(?,'account',?,'delete_account','user',?,?)")
+      .bind(crypto.randomUUID(), `user:${user.id}`, user.id, JSON.stringify({ email: user.email })).run();
     await env.DB.prepare('DELETE FROM users WHERE id=?').bind(user.id).run();
     return json({ ok: true }, 200, { 'Set-Cookie': sessionCookie('', 0) });
   }

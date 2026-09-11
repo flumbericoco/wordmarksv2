@@ -48,7 +48,7 @@ function constantTimeEqual(value: string, expected?: string): boolean {
   return result === 0;
 }
 
-function getCookie(request: Request, name: string): string | null {
+export function getCookie(request: Request, name: string): string | null {
   const cookie = request.headers.get('Cookie') || '';
   for (const part of cookie.split(';')) {
     const [key, ...rest] = part.trim().split('=');
@@ -72,7 +72,11 @@ async function hmac(value: string, secret: string): Promise<string> {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-export async function createAdminSession(secret: string, lifetimeSeconds = 60 * 60 * 8): Promise<string> {
+export async function adminSessionKey(value: string, secret: string): Promise<string> {
+  return `admin-session:${await hmac(value, secret)}`;
+}
+
+export async function createAdminSession(secret: string, lifetimeSeconds = 60 * 60): Promise<string> {
   const expires = Math.floor(Date.now() / 1000) + lifetimeSeconds;
   const nonce = crypto.randomUUID();
   const payload = `${expires}.${nonce}`;
@@ -93,7 +97,7 @@ async function validateAdminSession(value: string, secret?: string): Promise<boo
  */
 export async function authenticateRequest(
   request: Request,
-  env: { WORDMARKS_MCP_TOKEN?: string; ADMIN_PASSWORD?: string },
+  env: { WORDMARKS_MCP_TOKEN?: string; ADMIN_PASSWORD?: string; DB?: D1Database },
   requireAdmin = false,
 ): Promise<AuthContext> {
   const ip = getClientIp(request);
@@ -102,7 +106,17 @@ export async function authenticateRequest(
   // Admin Studio uses an HttpOnly cookie, so secrets are never stored in JS/localStorage.
   const adminCookie = getCookie(request, 'wm_admin');
   if (adminCookie && await validateAdminSession(adminCookie, env.ADMIN_PASSWORD)) {
-    return { authenticated: true, isAdmin: true, actor: `admin-cookie:${ip}` };
+    if (env.DB && env.ADMIN_PASSWORD) {
+      const key = await adminSessionKey(adminCookie, env.ADMIN_PASSWORD);
+      const row = await env.DB.prepare('SELECT value FROM settings WHERE key=?').bind(key).first<{ value: string }>();
+      const expires = Number(row?.value || 0);
+      if (expires > Math.floor(Date.now() / 1000)) {
+        return { authenticated: true, isAdmin: true, actor: `admin-cookie:${ip}` };
+      }
+      if (row) await env.DB.prepare('DELETE FROM settings WHERE key=?').bind(key).run().catch(() => undefined);
+    } else if (!env.DB) {
+      return { authenticated: true, isAdmin: true, actor: `admin-cookie:${ip}` };
+    }
   }
 
   // The legacy MCP token authenticates integrations only. It never grants admin access.

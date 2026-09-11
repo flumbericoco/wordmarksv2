@@ -1,6 +1,7 @@
 interface Env { DB: D1Database; STRIPE_WEBHOOK_SECRET?: string }
 
 const monthlyCredits: Record<string, number> = { lite: 1, growth: 4, pro: 10, scale: 28 };
+const expectedAmounts: Record<string, number> = { lite: 100, growth: 300, pro: 700, scale: 1700 };
 const encoder = new TextEncoder();
 
 function hex(bytes: ArrayBuffer): string {
@@ -50,18 +51,19 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (!env.STRIPE_WEBHOOK_SECRET || !await verifySignature(raw, signature, env.STRIPE_WEBHOOK_SECRET)) {
     return Response.json({ error: 'Invalid signature' }, { status: 400 });
   }
-  const event = JSON.parse(raw) as { id: string; type: string; data: { object: Record<string, unknown> } };
+  const event = JSON.parse(raw) as { id: string; type: string; created?: number; data: { object: Record<string, unknown> } };
   const object = event.data.object;
 
   let claimed = await env.DB.prepare(
     "INSERT OR IGNORE INTO payment_events (event_id, event_type, status) VALUES (?, ?, 'processing')"
   ).bind(event.id, event.type).run();
   if (!claimed.meta.changes) {
-    const previous = await env.DB.prepare('SELECT status FROM payment_events WHERE event_id=?').bind(event.id).first<{ status: string }>();
-    if (previous?.status === 'processed' || previous?.status === 'processing') {
+    const previous = await env.DB.prepare('SELECT status,created_at FROM payment_events WHERE event_id=?').bind(event.id).first<{ status: string; created_at: string }>();
+    const staleProcessing = previous?.status === 'processing' && Date.now() - new Date(`${previous.created_at}Z`).getTime() > 5 * 60_000;
+    if (previous?.status === 'processed' || (previous?.status === 'processing' && !staleProcessing)) {
       return Response.json({ received: true, duplicate: true });
     }
-    claimed = await env.DB.prepare("UPDATE payment_events SET status='processing', error=NULL WHERE event_id=? AND status='failed'")
+    claimed = await env.DB.prepare("UPDATE payment_events SET status='processing', error=NULL, created_at=datetime('now') WHERE event_id=? AND (status='failed' OR status='processing')")
       .bind(event.id).run();
     if (!claimed.meta.changes) return Response.json({ received: true, duplicate: true });
   }
@@ -75,12 +77,14 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const kind = metadata?.kind;
     const paymentStatus = String(object.payment_status || '');
     if (userId && kind === 'topup' && paymentStatus === 'paid') {
+      if (String(object.currency || '').toLowerCase() !== 'usd' || Number(object.amount_total) !== 2500) throw new Error('Invalid top-up amount');
       await addCredits(env.DB, userId, 25, 'credit_topup', `checkout:${String(object.id)}`);
       await env.DB.prepare(`INSERT INTO payment_transactions(id,user_id,stripe_checkout_id,stripe_payment_intent_id,kind,amount,currency,credits,status) VALUES (?,?,?,?,?,?,?,?, 'paid') ON CONFLICT(stripe_checkout_id) DO UPDATE SET status='paid',updated_at=datetime('now')`)
         .bind(crypto.randomUUID(),userId,String(object.id),String(object.payment_intent||''),'topup',Number(object.amount_total||0),String(object.currency||'usd'),25).run();
     }
     if (userId && plan && paymentStatus === 'paid') {
       const activationCredits = monthlyCredits[plan] || 0;
+      if (!activationCredits || String(object.currency || '').toLowerCase() !== 'usd' || Number(object.amount_total) !== expectedAmounts[plan]) throw new Error('Invalid subscription amount or plan');
       await addCredits(env.DB, userId, activationCredits, 'subscription_activation', `checkout:${String(object.id)}`);
       await env.DB.batch([
         env.DB.prepare("UPDATE users SET plan = ?, stripe_customer_id = ?, updated_at = datetime('now') WHERE id = ?")
@@ -107,11 +111,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const subscription = await env.DB.prepare('SELECT user_id, plan FROM subscriptions WHERE stripe_subscription_id = ?').bind(subscriptionId).first<Record<string, unknown>>();
     if (subscription) {
       const plan = String(subscription.plan);
+      if (!monthlyCredits[plan] || String(object.currency || '').toLowerCase() !== 'usd' || Number(object.amount_paid) !== expectedAmounts[plan]) throw new Error('Invalid renewal amount or plan');
       await addCredits(env.DB, String(subscription.user_id), monthlyCredits[plan] || 0, 'monthly_renewal', `invoice:${String(object.id)}`);
       await env.DB.prepare(
         `INSERT OR IGNORE INTO payment_transactions
-         (id,user_id,stripe_invoice_id,kind,amount,currency,credits,status) VALUES (?,?,?,?,?,?,?,'paid')`
-      ).bind(crypto.randomUUID(), String(subscription.user_id), String(object.id), 'renewal', Number(object.amount_paid || 0), String(object.currency || 'usd'), monthlyCredits[plan] || 0).run();
+         (id,user_id,stripe_payment_intent_id,stripe_invoice_id,kind,amount,currency,credits,status) VALUES (?,?,?,?,?,?,?,?,'paid')`
+      ).bind(crypto.randomUUID(), String(subscription.user_id), String(object.payment_intent || ''), String(object.id), 'renewal', Number(object.amount_paid || 0), String(object.currency || 'usd'), monthlyCredits[plan] || 0).run();
     }
   }
 
@@ -123,11 +128,20 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (event.type === 'charge.refunded' || event.type === 'charge.dispute.created') {
     const paymentIntent = String(object.payment_intent || '');
     const transaction = paymentIntent
-      ? await env.DB.prepare('SELECT id,user_id,credits FROM payment_transactions WHERE stripe_payment_intent_id=? LIMIT 1').bind(paymentIntent).first<Record<string, unknown>>()
+      ? await env.DB.prepare('SELECT id,user_id,credits,amount FROM payment_transactions WHERE stripe_payment_intent_id=? LIMIT 1').bind(paymentIntent).first<Record<string, unknown>>()
       : null;
     if (transaction) {
       const reason = event.type === 'charge.refunded' ? 'payment_refund' : 'payment_dispute';
-      await revokeAvailableCredits(env.DB, String(transaction.user_id), Number(transaction.credits || 0), reason, `${reason}:${event.id}`);
+      const stateKey = `payment-revoked:${String(transaction.id)}`;
+      const state = await env.DB.prepare('SELECT value FROM settings WHERE key=?').bind(stateKey).first<{ value: string }>();
+      const previouslyRevoked = Math.max(0, Number(state?.value || 0));
+      const transactionAmount = Math.max(1, Number(transaction.amount || 0));
+      const affectedAmount = event.type === 'charge.refunded' ? Number(object.amount_refunded || 0) : transactionAmount;
+      const targetRevoked = Math.min(Number(transaction.credits || 0), Math.ceil(Number(transaction.credits || 0) * affectedAmount / transactionAmount));
+      const delta = Math.max(0, targetRevoked - previouslyRevoked);
+      if (delta) await revokeAvailableCredits(env.DB, String(transaction.user_id), delta, reason, `${reason}:${event.id}`);
+      await env.DB.prepare("INSERT INTO settings(key,value,updated_at) VALUES(?,?,datetime('now')) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=datetime('now')")
+        .bind(stateKey, String(Math.max(previouslyRevoked, targetRevoked))).run();
       await env.DB.prepare("UPDATE payment_transactions SET status=?, updated_at=datetime('now') WHERE id=?")
         .bind(event.type === 'charge.refunded' ? 'refunded' : 'disputed', String(transaction.id)).run();
     }
@@ -145,6 +159,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   if (event.type === 'customer.subscription.deleted') {
     const subscriptionId = String(object.id);
+    const orderKey = `stripe-subscription-event:${subscriptionId}`;
+    const lastEvent = await env.DB.prepare('SELECT value FROM settings WHERE key=?').bind(orderKey).first<{ value: string }>();
+    if (Number(lastEvent?.value || 0) > Number(event.created || 0)) {
+      await env.DB.prepare("UPDATE payment_events SET status='processed', processed_at=datetime('now') WHERE event_id=?").bind(event.id).run();
+      return Response.json({ received: true, stale: true });
+    }
     const subscription = await env.DB.prepare('SELECT user_id FROM subscriptions WHERE stripe_subscription_id = ?')
       .bind(subscriptionId).first<Record<string, unknown>>();
     if (subscription) {
@@ -153,6 +173,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         env.DB.prepare("UPDATE users SET plan='none', updated_at=datetime('now') WHERE id = ?").bind(String(subscription.user_id)),
       ]);
     }
+    await env.DB.prepare("INSERT INTO settings(key,value,updated_at) VALUES(?,?,datetime('now')) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=datetime('now')")
+      .bind(orderKey, String(event.created || 0)).run();
   }
 
   if (event.type === 'customer.subscription.updated') {
@@ -161,6 +183,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const plan = metadata?.plan;
     const items = object.items as { data?: Array<Record<string, unknown>> } | undefined;
     const periodEnd = object.current_period_end || items?.data?.[0]?.current_period_end || object.cancel_at;
+    const orderKey = `stripe-subscription-event:${String(object.id)}`;
+    const lastEvent = await env.DB.prepare('SELECT value FROM settings WHERE key=?').bind(orderKey).first<{ value: string }>();
+    if (Number(lastEvent?.value || 0) > Number(event.created || 0)) {
+      await env.DB.prepare("UPDATE payment_events SET status='processed', processed_at=datetime('now') WHERE event_id=?").bind(event.id).run();
+      return Response.json({ received: true, stale: true });
+    }
     await env.DB.prepare(
       "UPDATE subscriptions SET status=?, current_period_end=?, updated_at=datetime('now') WHERE stripe_subscription_id=?"
     ).bind(status, periodEnd ? new Date(Number(periodEnd) * 1000).toISOString() : null, String(object.id)).run();
@@ -168,6 +196,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       await env.DB.prepare("UPDATE users SET plan=?, updated_at=datetime('now') WHERE id=(SELECT user_id FROM subscriptions WHERE stripe_subscription_id=?)")
         .bind(plan, String(object.id)).run();
     }
+    await env.DB.prepare("INSERT INTO settings(key,value,updated_at) VALUES(?,?,datetime('now')) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=datetime('now')")
+      .bind(orderKey, String(event.created || 0)).run();
   }
 
   await env.DB.prepare("UPDATE payment_events SET status='processed', processed_at=datetime('now') WHERE event_id=?")

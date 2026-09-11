@@ -21,8 +21,11 @@ export async function fulfillPaidCheckout(db: D1Database, session: StripeCheckou
   if (kind !== 'topup' && !(kind === 'subscription' && plan)) throw new Error('Invalid checkout metadata');
 
   const monthlyCredits: Record<string, number> = { lite: 1, growth: 4, pro: 10, scale: 28 };
+  const expectedAmounts: Record<string, number> = { lite: 100, growth: 300, pro: 700, scale: 1700 };
   const credits = kind === 'topup' ? 25 : monthlyCredits[String(plan)] || 0;
   if (!credits) throw new Error('Invalid checkout plan');
+  const expectedAmount = kind === 'topup' ? 2500 : expectedAmounts[String(plan)];
+  if (String(session.currency || '').toLowerCase() !== 'usd' || Number(session.amount_total) !== expectedAmount) throw new Error('Checkout amount or currency does not match the selected product');
   const reference = `checkout:${sessionId}`;
   const existing = await db.prepare('SELECT id FROM credit_ledger WHERE reference=?').bind(reference).first();
   if (existing) return { fulfilled: true, alreadyProcessed: true, paymentStatus: 'paid' };

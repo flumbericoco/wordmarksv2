@@ -3,6 +3,8 @@
 import { successResponse, errorResponse, ValidationError, NotFoundError, UnauthorizedError } from '../../../lib/errors';
 import { validateProviderRequest, type ProviderRequest } from '../../../lib/validation';
 import { authenticateRequest } from '../auth';
+import { recordAudit } from '../audit';
+import { isAllowedProvider } from '../providers';
 
 interface Env {
   DB: D1Database;
@@ -56,6 +58,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
       const id = crypto.randomUUID();
       const { name, baseUrl, textModel, imageModel, isActive } = validated.data;
+      if (!isAllowedProvider(baseUrl)) throw new ValidationError('Provider URL is not in the approved provider allowlist');
 
       // If setting active, deactivate others first
       if (isActive) {
@@ -66,6 +69,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         `INSERT INTO providers (id, name, base_url, text_model, image_model, is_active, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`
       ).bind(id, name, baseUrl, textModel, imageModel || '', isActive ? 1 : 0).run();
+      await recordAudit(env.DB, auth.actor, 'create_provider', 'provider', id, { name, baseUrl, textModel, imageModel, isActive });
 
       return successResponse({ id, name, baseUrl, textModel, imageModel, isActive }, requestId, 201);
     }
@@ -77,6 +81,13 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
       const existing = await env.DB.prepare('SELECT * FROM providers WHERE id = ?').bind(id).first();
       if (!existing) throw new NotFoundError('Provider not found');
+      const candidate = {
+        name: updates.name ?? String(existing.name), baseUrl: updates.baseUrl ?? String(existing.base_url),
+        textModel: updates.textModel ?? String(existing.text_model), imageModel: updates.imageModel ?? String(existing.image_model),
+        isActive: updates.isActive ?? Boolean(existing.is_active),
+      };
+      const validated = validateProviderRequest(candidate);
+      if (!validated.valid || !isAllowedProvider(candidate.baseUrl)) throw new ValidationError(validated.valid ? 'Provider URL is not in the approved provider allowlist' : validated.error);
 
       const fields: string[] = [];
       const values: unknown[] = [];
@@ -102,6 +113,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       }
 
       const updated = await env.DB.prepare('SELECT * FROM providers WHERE id = ?').bind(id).first();
+      await recordAudit(env.DB, auth.actor, 'update_provider', 'provider', id, { before: redactProvider(existing as Record<string, unknown>), updates });
       return successResponse(updated ? redactProvider(updated) : null, requestId);
     }
 
@@ -114,6 +126,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       if (!existing) throw new NotFoundError('Provider not found');
 
       await env.DB.prepare('DELETE FROM providers WHERE id = ?').bind(id).run();
+      await recordAudit(env.DB, auth.actor, 'delete_provider', 'provider', id, { provider: redactProvider(existing as Record<string, unknown>) });
       return successResponse({ deleted: true }, requestId);
     }
 

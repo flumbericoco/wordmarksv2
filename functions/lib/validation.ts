@@ -71,19 +71,22 @@ export function validateGenerateRequest(body: unknown): ValidationResult<Generat
   if (!isString(brandName) || brandName.trim().length === 0) {
     return { valid: false, error: 'brandName is required' };
   }
+  if (brandName.length > 100 || (description !== undefined && (!isString(description) || description.length > 500))) {
+    return { valid: false, error: 'Brand name or description is too long' };
+  }
   if (brandName.length > 100) {
     return { valid: false, error: 'brandName must be 100 characters or less' };
   }
-  if (description !== undefined && !isString(description)) {
-    return { valid: false, error: 'description must be a string' };
+  if (description !== undefined && (!isString(description) || description.length > 500)) {
+    return { valid: false, error: 'description must be a string of 500 characters or less' };
   }
-  if (style !== undefined && !isString(style)) {
-    return { valid: false, error: 'style must be a string' };
+  if (style !== undefined && (!isString(style) || style.length > 100)) {
+    return { valid: false, error: 'style must be 100 characters or less' };
   }
-  if (colorPreference !== undefined && !isString(colorPreference)) {
+  if (colorPreference !== undefined && (!isString(colorPreference) || colorPreference.length > 100)) {
     return { valid: false, error: 'colorPreference must be a string' };
   }
-  if (layout !== undefined && !isString(layout)) {
+  if (layout !== undefined && (!isString(layout) || layout.length > 100)) {
     return { valid: false, error: 'layout must be a string' };
   }
   if (referenceImages !== undefined) {
@@ -92,6 +95,9 @@ export function validateGenerateRequest(body: unknown): ValidationResult<Generat
     }
     if (referenceImages.length > 5) {
       return { valid: false, error: 'referenceImages must have 5 or fewer items' };
+    }
+    if (referenceImages.some((item) => !isString(item) || item.length > 1_500_000 || (!item.startsWith('data:image/') && !item.startsWith('https://')))) {
+      return { valid: false, error: 'referenceImages contain an invalid or oversized image' };
     }
   }
   if (variationSeed !== undefined && (!isString(variationSeed) || variationSeed.length > 100)) {
@@ -168,17 +174,20 @@ export function validateIterateRequest(body: unknown): ValidationResult<IterateR
   if (!isObject(body)) return { valid: false, error: 'Request body must be a JSON object' };
   const { originalPrompt, feedback, suggestions, data } = body;
 
-  if (!isString(originalPrompt) || originalPrompt.trim().length === 0) {
+  if (!isString(originalPrompt) || originalPrompt.trim().length === 0 || originalPrompt.length > 10_000) {
     return { valid: false, error: 'originalPrompt is required' };
   }
-  if (!isString(feedback) || feedback.trim().length === 0) {
+  if (!isString(feedback) || feedback.trim().length === 0 || feedback.length > 2_000) {
     return { valid: false, error: 'feedback is required' };
   }
-  if (!isArray(suggestions)) {
+  if (!isArray(suggestions) || suggestions.length > 10 || suggestions.some((item) => !isString(item) || item.length > 500)) {
     return { valid: false, error: 'suggestions must be an array' };
   }
   if (!isObject(data) || !isString(data.brandName)) {
     return { valid: false, error: 'data.brandName is required' };
+  }
+  if (data.brandName.length > 100 || (isString(data.description) && data.description.length > 500)) {
+    return { valid: false, error: 'Iteration brand data is too long' };
   }
 
   return {
@@ -215,6 +224,9 @@ export function validateProviderRequest(body: unknown): ValidationResult<Provide
 
   if (!isString(name) || name.trim().length === 0) {
     return { valid: false, error: 'name is required' };
+  }
+  if (name.length > 100 || (isString(textModel) && textModel.length > 200) || (isString(imageModel) && imageModel.length > 200)) {
+    return { valid: false, error: 'Provider fields are too long' };
   }
   if (!isString(baseUrl) || baseUrl.trim().length === 0) {
     return { valid: false, error: 'baseUrl is required' };
@@ -311,11 +323,17 @@ export function validateKnowledgeBaseRequest(body: unknown): ValidationResult<Kn
   if (!isString(filename) || filename.trim().length === 0) {
     return { valid: false, error: 'filename is required' };
   }
+  if (filename.length > 180 || (isString(category) && category.length > 80) || (isString(description) && description.length > 2000)) {
+    return { valid: false, error: 'Knowledge base fields are too long' };
+  }
   if (category !== undefined && !isString(category)) {
     return { valid: false, error: 'category must be a string' };
   }
   if (tags !== undefined && !isArray(tags)) {
     return { valid: false, error: 'tags must be an array' };
+  }
+  if (isArray(tags) && (tags.length > 30 || tags.some((tag) => !isString(tag) || tag.length > 80))) {
+    return { valid: false, error: 'tags must contain up to 30 short strings' };
   }
   if (description !== undefined && !isString(description)) {
     return { valid: false, error: 'description must be a string' };

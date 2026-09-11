@@ -89,12 +89,25 @@ async function getKvRateLimit(
   }
 }
 
+async function getDbRateLimit(key: string, config: RateLimitConfig, db: D1Database): Promise<RateLimitResult> {
+  const now = Date.now();
+  const windowStart = Math.floor(now / config.windowMs) * config.windowMs;
+  const idBytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${key}:${windowStart}`));
+  const id = Array.from(new Uint8Array(idBytes), (value) => value.toString(16).padStart(2, '0')).join('');
+  const row = await db.prepare(`INSERT INTO usage_counters(id,token,action,count,window_start)
+    VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET count=count+1 RETURNING count`)
+    .bind(id, key.slice(0, 240), 'rate_limit', 1, new Date(windowStart).toISOString()).first<{ count: number }>();
+  const count = Number(row?.count || 1);
+  const resetAt = windowStart + config.windowMs;
+  return { allowed: count <= config.maxRequests, remaining: Math.max(0, config.maxRequests - count), limit: config.maxRequests, resetAt, retryAfter: count <= config.maxRequests ? undefined : Math.ceil((resetAt - now) / 1000) };
+}
+
 // ─── Public API ─────────────────────────────────────────
 
 export async function checkRateLimit(
   identifier: string,
   action: string,
-  env: { WORDMARKS_KV?: KVNamespace },
+  env: { WORDMARKS_KV?: KVNamespace; DB?: D1Database },
   tier?: 'unauthenticated' | 'authenticated' | 'generation' | 'admin',
 ): Promise<RateLimitResult> {
   // Determine tier
@@ -102,7 +115,11 @@ export async function checkRateLimit(
   const config = RATE_LIMITS[rateLimitTier];
   const key = `rl:${identifier}:${action}`;
 
-  // Try KV first, fall back to memory
+  // D1's UPSERT is atomic; KV read-modify-write is not safe under concurrency.
+  if (env.DB) {
+    try { return await getDbRateLimit(key, config, env.DB); } catch { /* fall through */ }
+  }
+  // Fall back to KV, then isolate memory if the database is unavailable.
   if (env.WORDMARKS_KV) {
     return getKvRateLimit(key, config, env.WORDMARKS_KV);
   }
