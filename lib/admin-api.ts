@@ -83,6 +83,8 @@ export async function testProvider(provider: { baseUrl: string; textModel: strin
 // ─── Settings API ───────────────────────────────────────
 
 export interface AdminSettings {
+  systemPrompt: string;
+  negativePrompt: string;
   defaultProviderId: string;
   maxIterations: number;
   imageQuality: 'standard' | 'hd';
@@ -109,6 +111,7 @@ export interface AdminKBItem {
   description: string;
   imageUrl?: string;
   imageData?: string; // Only in detail view
+  kind?: 'image' | 'document';
   createdAt: string;
 }
 

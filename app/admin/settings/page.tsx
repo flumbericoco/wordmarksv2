@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { getSettings, updateSettings, exportData, type AdminSettings } from '@/lib/admin-api';
 
 const DEFAULT_SETTINGS: AdminSettings = {
+  systemPrompt: '',
+  negativePrompt: '',
   defaultProviderId: '',
   maxIterations: 3,
   imageQuality: 'hd',
@@ -82,6 +84,37 @@ export default function SettingsPage() {
       )}
 
       <div className="space-y-6">
+        <div className="rounded-xl border border-blue-500/25 bg-blue-500/[0.06] p-6 space-y-5">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-blue-400">Logo Creator Instructions</p>
+            <h3 className="mt-2 text-lg font-semibold text-white">Configure it like a Custom GPT</h3>
+            <p className="mt-1 text-xs leading-5 text-zinc-400">These private instructions are prepended to every logo request and are never shown to users.</p>
+          </div>
+          <div>
+            <label className="mb-2 block text-xs font-medium text-zinc-300">System prompt / Instructions</label>
+            <textarea
+              value={settings.systemPrompt}
+              onChange={(e) => setSettings({ ...settings, systemPrompt: e.target.value })}
+              rows={12}
+              maxLength={20000}
+              placeholder="Describe the role, design process, quality bar, and required output..."
+              className="w-full resize-y rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm leading-6 text-white outline-none focus:border-blue-500/60"
+            />
+            <p className="mt-1 text-right text-[11px] text-zinc-600">{settings.systemPrompt.length.toLocaleString()} / 20,000</p>
+          </div>
+          <div>
+            <label className="mb-2 block text-xs font-medium text-zinc-300">Avoid / Negative instructions</label>
+            <textarea
+              value={settings.negativePrompt}
+              onChange={(e) => setSettings({ ...settings, negativePrompt: e.target.value })}
+              rows={4}
+              maxLength={5000}
+              placeholder="Generic icons, mockups, misspellings, extra text..."
+              className="w-full resize-y rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm leading-6 text-white outline-none focus:border-blue-500/60"
+            />
+          </div>
+        </div>
+
         {/* Image Generation */}
         <div className="rounded-xl border border-white/10 bg-white/5 p-6 space-y-4">
           <h3 className="text-sm font-semibold text-white">Image Generation</h3>

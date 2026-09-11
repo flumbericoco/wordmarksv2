@@ -77,7 +77,7 @@ export default function LogoResultView({
                 <button onClick={() => onDownload('png')} className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-500">Download PNG</button>
               </>
             ) : (
-              <button onClick={() => onDownload('png')} className="rounded-lg bg-green-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-green-500">Download PNG</button>
+              <><button onClick={() => onDownload('svg')} className="rounded-lg border border-white/15 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10">Create SVG</button><button onClick={() => onDownload('png')} className="rounded-lg bg-green-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-green-500">Download PNG</button></>
             )}
           </div>
         </div>

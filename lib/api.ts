@@ -97,6 +97,10 @@ export async function reviewLogo(
   });
 }
 
+export async function vectorizeLogo(imageUrl: string, brandName: string, description?: string): Promise<{ imageUrl: string }> {
+  return apiCall<{ imageUrl: string }>('vectorize-logo', { imageUrl, brandName, description });
+}
+
 export async function iterateLogo(
   originalPrompt: string,
   feedback: string,

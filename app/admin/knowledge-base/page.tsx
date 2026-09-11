@@ -10,7 +10,8 @@ import {
   type AdminKBItem,
 } from '@/lib/admin-api';
 
-const CATEGORIES = ['Logo Reference', 'Style Guide', 'Typography', 'Color Palette', 'Industry Example', 'Other'];
+const CATEGORIES = ['Instructions', 'Brand Guide', 'Logo Reference', 'Style Guide', 'Typography', 'Color Palette', 'Industry Example', 'Other'];
+const TEXT_EXTENSIONS = ['txt', 'md', 'markdown', 'csv', 'json'];
 
 export default function KnowledgeBasePage() {
   const { confirm } = useNotifications();
@@ -46,21 +47,25 @@ export default function KnowledgeBasePage() {
 
     try {
       for (const file of Array.from(files)) {
-        if (!file.type.startsWith('image/')) continue;
+        const extension = file.name.split('.').pop()?.toLowerCase() || '';
+        const isImage = ['image/png', 'image/jpeg', 'image/webp'].includes(file.type);
+        const isText = file.type.startsWith('text/') || TEXT_EXTENSIONS.includes(extension);
+        if (!isImage && !isText) throw new Error(`${file.name}: use PNG, JPG, WebP, TXT, MD, CSV, or JSON`);
+        if (file.size > 5_000_000) throw new Error(`${file.name}: maximum file size is 5MB`);
 
-        // Convert to base64 for server upload
-        const imageData = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = (e) => resolve(e.target?.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
-
-        await createKBItem({
-          filename: file.name,
-          category: 'Logo Reference',
-          imageData,
-        });
+        if (isImage) {
+          const imageData = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target?.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+          await createKBItem({ filename: file.name, category: 'Logo Reference', imageData });
+        } else {
+          const content = (await file.text()).trim();
+          if (!content) throw new Error(`${file.name}: file is empty`);
+          await createKBItem({ filename: file.name, category: 'Brand Guide', description: content.slice(0, 20_000) });
+        }
       }
       await loadItems();
     } catch (e) {
@@ -101,19 +106,19 @@ export default function KnowledgeBasePage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Knowledge Base</h1>
-          <p className="mt-1 text-sm text-zinc-400">Upload reference logos for the AI to study</p>
+          <p className="mt-1 text-sm text-zinc-400">Upload instructions, brand guides, and visual references used by every generation</p>
         </div>
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
           className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 transition-colors disabled:opacity-50"
         >
-          {uploading ? 'Uploading...' : '+ Upload Images'}
+          {uploading ? 'Uploading...' : '+ Upload Knowledge'}
         </button>
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
+          accept="image/png,image/jpeg,image/webp,.txt,.md,.markdown,.csv,.json"
           multiple
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}
@@ -160,9 +165,9 @@ export default function KnowledgeBasePage() {
         className="cursor-pointer rounded-xl border-2 border-dashed border-white/10 bg-white/5 p-6 text-center transition-colors hover:border-white/20 hover:bg-white/10"
       >
         <p className="text-sm text-zinc-400">
-          Drag & drop images here, or <span className="text-blue-400">click to browse</span>
+          Drag & drop knowledge files here, or <span className="text-blue-400">click to browse</span>
         </p>
-        <p className="mt-1 text-xs text-zinc-600">PNG, JPG, SVG — logos you like, style references, etc.</p>
+        <p className="mt-1 text-xs text-zinc-600">PNG, JPG, WebP, TXT, Markdown, CSV, JSON · multiple files · 5MB each</p>
       </div>
 
       {loading ? (
@@ -183,8 +188,8 @@ export default function KnowledgeBasePage() {
                     className="h-40 w-full object-cover"
                   />
                 ) : (
-                  <div className="h-40 w-full flex items-center justify-center bg-white/5 text-zinc-600">
-                    No preview
+                  <div className="h-40 w-full flex flex-col items-center justify-center bg-white/5 px-6 text-center text-zinc-500">
+                    <span className="text-3xl">⌑</span><span className="mt-2 text-xs">Knowledge document</span>
                   </div>
                 )}
                 <button
@@ -222,8 +227,8 @@ export default function KnowledgeBasePage() {
         <div className="rounded-xl border border-white/10 bg-white/5 p-8 text-center">
           <p className="text-sm text-zinc-500">
             {filterCategory === 'all'
-              ? 'No reference images uploaded yet.'
-              : `No images in "${filterCategory}" category.`}
+              ? 'No knowledge uploaded yet.'
+              : `No files in "${filterCategory}" category.`}
           </p>
         </div>
       )}

@@ -257,6 +257,8 @@ export function validateProviderRequest(body: unknown): ValidationResult<Provide
 // ─── Settings Update Request ────────────────────────────
 
 export interface SettingsRequest {
+  systemPrompt?: string;
+  negativePrompt?: string;
   defaultProviderId?: string;
   maxIterations?: number;
   imageQuality?: 'standard' | 'hd';
@@ -270,6 +272,15 @@ export function validateSettingsRequest(body: unknown): ValidationResult<Setting
 
   const result: SettingsRequest = {};
   const b = body as Record<string, unknown>;
+
+  if (b.systemPrompt !== undefined) {
+    if (!isString(b.systemPrompt) || b.systemPrompt.length > 20_000) return { valid: false, error: 'systemPrompt must be at most 20,000 characters' };
+    result.systemPrompt = b.systemPrompt.trim();
+  }
+  if (b.negativePrompt !== undefined) {
+    if (!isString(b.negativePrompt) || b.negativePrompt.length > 5_000) return { valid: false, error: 'negativePrompt must be at most 5,000 characters' };
+    result.negativePrompt = b.negativePrompt.trim();
+  }
 
   if (b.defaultProviderId !== undefined) {
     if (!isString(b.defaultProviderId)) return { valid: false, error: 'defaultProviderId must be a string' };
@@ -323,7 +334,7 @@ export function validateKnowledgeBaseRequest(body: unknown): ValidationResult<Kn
   if (!isString(filename) || filename.trim().length === 0) {
     return { valid: false, error: 'filename is required' };
   }
-  if (filename.length > 180 || (isString(category) && category.length > 80) || (isString(description) && description.length > 2000)) {
+  if (filename.length > 180 || (isString(category) && category.length > 80) || (isString(description) && description.length > 20_000)) {
     return { valid: false, error: 'Knowledge base fields are too long' };
   }
   if (category !== undefined && !isString(category)) {

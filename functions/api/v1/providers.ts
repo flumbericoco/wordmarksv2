@@ -97,6 +97,7 @@ interface ProviderCallOptions {
   maxRetries?: number;
   quality?: 'standard' | 'hd';
   size?: '1024x1024' | '1792x1024' | '1024x1792';
+  referenceImages?: string[];
 }
 
 async function sleep(ms: number): Promise<void> {
@@ -254,8 +255,10 @@ export async function generateImageServer(
   const timeoutMs = options?.timeoutMs ?? 60_000;
   const maxRetries = options?.maxRetries ?? 2;
 
-  // Try gpt-image-1 with Chat Completions + modalities first
-  if (model.includes('gpt-image')) {
+  // OpenAI-compatible gateways may expose image output through Chat
+  // Completions (including PesatRouter), not /images/generations.
+  const tryChatImage = model.includes('gpt-image') || new URL(baseUrl).hostname === 'api.pesatrouter.com';
+  if (tryChatImage) {
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -268,7 +271,12 @@ export async function generateImageServer(
         },
         body: JSON.stringify({
           model,
-          messages: [{ role: 'user', content: prompt }],
+          messages: [{ role: 'user', content: options?.referenceImages?.length
+            ? [
+                { type: 'text', text: `${prompt}\n\nUse the attached images only as visual quality/style references. Create an original mark; do not copy them.` },
+                ...options.referenceImages.slice(0, 3).map((url) => ({ type: 'image_url', image_url: { url } })),
+              ]
+            : prompt }],
           modalities: ['text', 'image'],
         }),
         signal: controller.signal,
@@ -280,6 +288,19 @@ export async function generateImageServer(
         const choices = data.choices as Array<Record<string, unknown>> | undefined;
         const message = choices?.[0]?.message as Record<string, unknown> | undefined;
         const content = message?.content;
+        const directImage = message?.image_url as Record<string, unknown> | string | undefined;
+        const directUrl = typeof directImage === 'string' ? directImage : directImage?.url;
+        if (typeof directUrl === 'string' && (directUrl.startsWith('data:image') || directUrl.startsWith('https://'))) {
+          return { url: directUrl, revisedPrompt: prompt };
+        }
+        const images = message?.images as Array<Record<string, unknown>> | undefined;
+        for (const image of images || []) {
+          const imageUrl = image.image_url as Record<string, unknown> | string | undefined;
+          const url = typeof imageUrl === 'string' ? imageUrl : imageUrl?.url;
+          if (typeof url === 'string' && (url.startsWith('data:image') || url.startsWith('https://'))) {
+            return { url, revisedPrompt: prompt };
+          }
+        }
         if (content && Array.isArray(content)) {
           for (const part of content) {
             const p = part as Record<string, unknown>;
@@ -294,9 +315,13 @@ export async function generateImageServer(
         if (typeof content === 'string' && content.startsWith('data:image')) {
           return { url: content, revisedPrompt: prompt };
         }
+        if (typeof content === 'string') {
+          const embedded = content.match(/(?:https:\/\/[^\s)"']+\.(?:png|jpe?g|webp)|data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+)/i)?.[0];
+          if (embedded) return { url: embedded, revisedPrompt: prompt };
+        }
       }
     } catch {
-      // Fall through to DALL-E
+      // Fall through to the standard image endpoint when supported.
     }
   }
 
@@ -319,7 +344,7 @@ export async function generateImageServer(
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: 'dall-e-3',
+          model,
           prompt,
           n: 1,
           size: options?.size || '1024x1024',
@@ -342,8 +367,9 @@ export async function generateImageServer(
       const data = await res.json() as Record<string, unknown>;
       const dataArr = data.data as Array<Record<string, unknown>> | undefined;
       const image = dataArr?.[0];
-      if (!image?.url) throw new Error('No image generated');
-      return { url: image.url as string, revisedPrompt: (image.revised_prompt as string) || prompt };
+      const imageUrl = image?.url || (typeof image?.b64_json === 'string' ? `data:image/png;base64,${image.b64_json}` : null);
+      if (!imageUrl) throw new Error('No image generated');
+      return { url: imageUrl as string, revisedPrompt: (image?.revised_prompt as string) || prompt };
     } catch (err: unknown) {
       clearTimeout(timer);
       if (err instanceof Error && err.name === 'AbortError') {

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { WizardData, LogoResult, QualityScore } from '@/lib/types';
-import { generateLogo, reviewLogo } from '@/lib/api';
+import { generateLogo, reviewLogo, vectorizeLogo } from '@/lib/api';
 import WizardContainer from '@/components/wizard/WizardContainer';
 import LogoResultView from '@/components/LogoResultView';
 import { useNotifications } from '@/components/Notifications';
@@ -237,7 +237,10 @@ export default function Home() {
   const handleDownload = async (format: 'svg' | 'png') => {
     if (!logo?.imageUrl || !wizardData) return;
     try {
-      const response = await fetch(logo.imageUrl);
+      const downloadImageUrl = format === 'svg' && !logo.imageUrl.startsWith('data:image/svg+xml')
+        ? (await vectorizeLogo(logo.imageUrl, wizardData.brandName, wizardData.description)).imageUrl
+        : logo.imageUrl;
+      const response = await fetch(downloadImageUrl);
       let blob = await response.blob();
       if (format === 'png' && logo.imageUrl.startsWith('data:image/svg+xml')) {
         const sourceUrl = URL.createObjectURL(blob);

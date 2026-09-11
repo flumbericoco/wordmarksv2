@@ -27,6 +27,7 @@ function redactItem(row: Record<string, unknown>, includeImage = false) {
     tags: typeof row.tags === 'string' ? JSON.parse(row.tags || '[]') : row.tags,
     description: row.description,
     imageUrl: row.image_url,
+    kind: row.image_data ? 'image' : 'document',
     createdAt: row.created_at,
   };
   if (includeImage) {
@@ -131,6 +132,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const id = crypto.randomUUID();
       const { filename, category, tags, description, imageData } = validated.data;
       if (imageData) decodeSafeImage(imageData);
+      if (!imageData && !description) throw new ValidationError('A document must contain readable text');
 
       // Store image in R2 if bucket is available, otherwise fall back to D1 base64
       let storedImageData: string | null = null;

@@ -12,7 +12,7 @@ import {
 } from '@/lib/admin-api';
 
 const PRESETS: Partial<AdminProvider>[] = [
-  { name: 'PesatRouter', baseUrl: 'https://api.pesatrouter.com/v1', textModel: 'pesat-pro', imageModel: '' },
+  { name: 'PesatRouter', baseUrl: 'https://api.pesatrouter.com/v1', textModel: 'pesat-pro', imageModel: 'pesat-pro' },
   { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', textModel: 'gpt-4o', imageModel: 'dall-e-3' },
   { name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', textModel: 'openai/gpt-4o', imageModel: 'openai/dall-e-3' },
   { name: 'Together AI', baseUrl: 'https://api.together.xyz/v1', textModel: 'meta-llama/Llama-3-70b-chat-hf', imageModel: 'stabilityai/stable-diffusion-xl' },

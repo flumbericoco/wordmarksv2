@@ -17,6 +17,8 @@ interface FunctionContext {
 }
 
 const DEFAULT_SETTINGS: Record<string, string> = {
+  systemPrompt: `You are the Pesat AI Logo Creator: a world-class identity designer. Create one original, iconic logo with the finish of a senior branding studio. Translate the business idea into a memorable symbol and a custom, perfectly kerned wordmark. Preserve exact spelling. Prefer bold simple geometry, meaningful negative space, optical balance, and a restrained palette. Return only the finished logo on a transparent background—never a mockup, poster, presentation board, explanation, or prompt.`,
+  negativePrompt: 'generic stock icon, clipart, template logo, mockup, poster, grid, watermark, tagline, extra text, misspelling, glow, bevel, 3D, photorealistic scene, busy detail',
   defaultProviderId: '',
   maxIterations: '3',
   imageQuality: 'hd',
@@ -43,6 +45,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       }
       // Parse typed values
       return successResponse({
+        systemPrompt: settings.systemPrompt || DEFAULT_SETTINGS.systemPrompt,
+        negativePrompt: settings.negativePrompt || DEFAULT_SETTINGS.negativePrompt,
         defaultProviderId: settings.defaultProviderId || '',
         maxIterations: parseInt(String(settings.maxIterations)) || 3,
         imageQuality: settings.imageQuality || 'hd',
@@ -84,6 +88,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       }
 
       return successResponse({
+        systemPrompt: settings.systemPrompt || DEFAULT_SETTINGS.systemPrompt,
+        negativePrompt: settings.negativePrompt || DEFAULT_SETTINGS.negativePrompt,
         defaultProviderId: settings.defaultProviderId || '',
         maxIterations: parseInt(String(settings.maxIterations)) || 3,
         imageQuality: settings.imageQuality || 'hd',

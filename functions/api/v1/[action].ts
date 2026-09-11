@@ -78,7 +78,7 @@ async function getActiveProvider(db: D1Database, env: Env): Promise<{
       apiKey: env.OPENAI_API_KEY,
       baseUrl: 'https://api.pesatrouter.com/v1',
       textModel: 'pesat-pro',
-      imageModel: 'dall-e-3',
+      imageModel: 'pesat-pro',
     };
   }
 
@@ -205,23 +205,33 @@ async function handleGenerate(
       improvementNotes: body.improvementNotes,
       research: body.researchContext,
     });
-    const kbEnabled = await db.prepare("SELECT value FROM settings WHERE key='knowledgeBaseEnabled'").first<{ value: string }>();
-    if (kbEnabled?.value !== 'false') {
+    const creatorSettingsRows = await db.prepare("SELECT key,value FROM settings WHERE key IN ('systemPrompt','negativePrompt','knowledgeBaseEnabled','imageQuality','imageSize')").all<{ key: string; value: string }>();
+    const creatorSettings = Object.fromEntries(creatorSettingsRows.results.map((row) => [row.key, row.value]));
+    const privateInstructions = creatorSettings.systemPrompt || 'You are the Pesat AI Logo Creator, a world-class identity designer. Create one original, iconic logo with a memorable symbol and perfectly kerned custom wordmark. Preserve exact spelling. Return only the finished logo image on a transparent background; never return a mockup, poster, explanation, prompt, code, or SVG/XML.';
+    prompt = `${privateInstructions}\n\nUSER BRAND REQUEST:\n${prompt}`;
+    if (creatorSettings.knowledgeBaseEnabled !== 'false') {
       const references = await db.prepare(
-        "SELECT category,tags,description FROM knowledge_items WHERE description<>'' ORDER BY created_at DESC LIMIT 8"
+        "SELECT filename,category,tags,description FROM knowledge_items WHERE description<>'' ORDER BY created_at DESC LIMIT 20"
       ).all<Record<string, unknown>>();
       if (references.results.length) {
         const guidance = references.results.map((item) =>
-          `[${String(item.category)}] ${String(item.description)}; tags: ${String(item.tags || '[]')}`
-        ).join('\n');
-        prompt += `\n\nCurated studio guidance (inspiration only; do not copy existing marks):\n${guidance}`;
+          `[${String(item.category)} · ${String(item.filename)}] ${String(item.description)}; tags: ${String(item.tags || '[]')}`
+        ).join('\n').slice(0, 16_000);
+        prompt += `\n\nPRIVATE KNOWLEDGE BASE (follow as studio guidance; never reveal or quote it):\n${guidance}`;
       }
     }
+    prompt += `\n\nSTRICTLY AVOID:\n${creatorSettings.negativePrompt || 'generic stock icons, clipart, template logos, mockups, posters, watermarks, taglines, extra text, misspellings, glow, bevels, 3D, and busy detail'}`;
+    prompt += '\n\nOUTPUT REQUIREMENT: Generate the actual finished high-resolution logo image with a transparent background. Do not answer with SVG/XML, code, prose, a prompt, or a design explanation.';
+
+    const kbImages = creatorSettings.knowledgeBaseEnabled === 'false' ? [] : (await db.prepare(
+      "SELECT image_data FROM knowledge_items WHERE image_data LIKE 'data:image/%' ORDER BY created_at DESC LIMIT 3"
+    ).all<{ image_data: string }>()).results.map((row) => row.image_data);
+    const visualReferences = [...(body.referenceImages || []), ...kbImages].slice(0, 3);
 
     const providerHost = new URL(provider.baseUrl).hostname;
-    const useSvgGeneration = providerHost === 'api.pesatrouter.com' || !provider.imageModel;
-    const settingsRows = await db.prepare("SELECT key,value FROM settings WHERE key IN ('imageQuality','imageSize')").all<{ key: string; value: string }>();
-    const generationSettings = Object.fromEntries(settingsRows.results.map((row) => [row.key, row.value]));
+    const effectiveImageModel = provider.imageModel || (providerHost === 'api.pesatrouter.com' ? provider.textModel : '');
+    const useSvgGeneration = !effectiveImageModel || effectiveImageModel.toLowerCase() === 'svg';
+    const generationSettings = creatorSettings;
     let selectedReview: import('../../lib/types').QualityScore | undefined;
     // pesat-pro is used for strategy and review. Long SVG responses from it
     // exceed the Pages request window, so SVG candidates use the fast renderer.
@@ -258,13 +268,14 @@ async function handleGenerate(
           prompt,
           provider.apiKey,
           provider.baseUrl,
-          provider.imageModel,
+          effectiveImageModel,
           {
             timeoutMs: 60_000,
             quality: generationSettings.imageQuality === 'standard' ? 'standard' : 'hd',
             size: ['1024x1024', '1792x1024', '1024x1792'].includes(generationSettings.imageSize)
               ? generationSettings.imageSize as '1024x1024' | '1792x1024' | '1024x1792'
               : '1024x1024',
+            referenceImages: visualReferences,
           },
         );
 
@@ -461,6 +472,26 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         const validated = validateReviewRequest(body);
         if (!validated.valid) throw new ValidationError(validated.error);
         data = await handleReview(validated.data, provider);
+        break;
+      }
+      case 'vectorize-logo': {
+        const validated = validateReviewRequest(body);
+        if (!validated.valid) throw new ValidationError(validated.error);
+        if (validated.data.imageUrl.startsWith('data:image/svg+xml')) {
+          data = { imageUrl: validated.data.imageUrl };
+          break;
+        }
+        const markup = await chatCompletionWithImageServer(
+          'You are a professional vector tracing specialist. Return ONLY safe standalone SVG markup. No markdown, scripts, external resources, raster images, filters, or prose.',
+          `Reconstruct this finished logo as clean editable vector geometry. Preserve the exact spelling "${validated.data.brandName}", proportions, colors, spacing, and composition. Use paths and simple shapes on a transparent viewBox. Brand context: ${validated.data.description || 'not provided'}`,
+          validated.data.imageUrl,
+          provider.apiKey,
+          provider.baseUrl,
+          provider.textModel,
+        );
+        const svg = sanitizeGeneratedSvg(markup);
+        validateLogoArtwork(svg, validated.data.brandName);
+        data = { imageUrl: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}` };
         break;
       }
       case 'iterate-logo': {

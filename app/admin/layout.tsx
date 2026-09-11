@@ -6,6 +6,7 @@ import { ReactNode } from 'react';
 
 const NAV_ITEMS = [
   { href: '/admin', label: 'Overview', short: 'OV', description: 'Workspace pulse' },
+  { href: '/admin/creator', label: 'Logo Creator', short: 'AI', description: 'Instructions & knowledge' },
   { href: '/admin/providers', label: 'Providers', short: 'AP', description: 'Models & API keys' },
   { href: '/admin/knowledge-base', label: 'Library', short: 'KB', description: 'Visual references' },
   { href: '/admin/settings', label: 'Settings', short: 'ST', description: 'Generation defaults' },
