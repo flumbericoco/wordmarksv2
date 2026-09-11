@@ -100,12 +100,23 @@ export default function AccountPage() {
       if (attempts >= 10) window.clearInterval(paymentPoller);
     }, 3000) : undefined;
     const refreshOnFocus = () => void load();
+    const refreshOnVisibility = () => {
+      if (document.visibilityState === 'visible') void load();
+    };
+    // MCP requests happen outside this browser tab, so keep the displayed
+    // balance in sync while the Account page remains open.
+    const accountPoller = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void load();
+    }, 10_000);
     window.addEventListener('focus', refreshOnFocus);
+    document.addEventListener('visibilitychange', refreshOnVisibility);
     return () => {
       window.removeEventListener('pageshow', restoreFromHistory);
       window.clearTimeout(timer);
       if (paymentPoller) window.clearInterval(paymentPoller);
+      window.clearInterval(accountPoller);
       window.removeEventListener('focus', refreshOnFocus);
+      document.removeEventListener('visibilitychange', refreshOnVisibility);
     };
   }, [load]);
 
