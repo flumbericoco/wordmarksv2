@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useNotifications } from '@/components/Notifications';
 import {
   listProviders,
   createProvider,
@@ -20,6 +21,7 @@ const PRESETS: Partial<AdminProvider>[] = [
 ];
 
 export default function ProvidersPage() {
+  const { confirm, notify } = useNotifications();
   const [providers, setProviders] = useState<AdminProvider[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
   const [form, setForm] = useState<Partial<AdminProvider>>({});
@@ -90,7 +92,7 @@ export default function ProvidersPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Delete this provider? This cannot be undone.')) return;
+    if (!await confirm({ title: 'Delete API provider?', message: 'This provider configuration will be permanently removed.', confirmLabel: 'Delete provider', tone: 'danger' })) return;
     try {
       await deleteProvider(id);
       await loadProviders();
@@ -114,7 +116,7 @@ export default function ProvidersPage() {
     setError(null);
     try {
       await testProvider({ baseUrl: form.baseUrl || '', textModel: form.textModel || '' });
-      window.alert('Connection successful. The provider accepted a chat completion request.');
+      notify('Connection successful. The provider accepted a chat completion request.', 'success');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Connection test failed');
     } finally {

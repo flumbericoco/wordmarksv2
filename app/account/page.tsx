@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { useNotifications } from '@/components/Notifications';
 
 interface User { id: string; email: string; plan: string; credits: number }
 interface ApiKey { id: string; name: string; key_prefix: string; created_at: string; last_used_at?: string; revoked_at?: string }
@@ -27,6 +28,7 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export default function AccountPage() {
+  const { confirm } = useNotifications();
   const [user, setUser] = useState<User | null>(null);
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [mode, setMode] = useState<'login' | 'register'>('register');
@@ -134,7 +136,7 @@ export default function AccountPage() {
   }
 
   async function revokeKey(id: string) {
-    if (!window.confirm('Revoke this API key? Connected agents using it will stop working.')) return;
+    if (!await confirm({ title: 'Revoke API key?', message: 'Connected AI agents using this key will stop working immediately.', confirmLabel: 'Revoke key', tone: 'danger' })) return;
     await api('account/revoke-key', { method: 'POST', body: JSON.stringify({ id }) });
     await load();
   }
@@ -163,7 +165,7 @@ export default function AccountPage() {
   }
 
   async function cancelSubscriptionNow() {
-    if (!window.confirm('End this subscription immediately? Future renewals will stop. Existing credits will remain available.')) return;
+    if (!await confirm({ title: 'End subscription now?', message: 'Future renewals will stop immediately. Your existing credits will remain available.', confirmLabel: 'End subscription', tone: 'danger' })) return;
     setBusy(true); setMessage('');
     try {
       await api('billing/cancel-now', { method: 'POST' });
@@ -180,7 +182,7 @@ export default function AccountPage() {
   }
 
   async function deleteAccount() {
-    if (!deletePassword || !window.confirm('Permanently delete this account, its API keys, credits, and logo history?')) return;
+    if (!deletePassword || !await confirm({ title: 'Permanently delete account?', message: 'Your API keys, credits, and logo history will be deleted. This action cannot be undone.', confirmLabel: 'Delete account', tone: 'danger' })) return;
     setBusy(true); setMessage('');
     try {
       await api('account/delete-account', { method: 'POST', body: JSON.stringify({ password: deletePassword }) });

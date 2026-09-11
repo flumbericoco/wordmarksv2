@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import { useNotifications } from '@/components/Notifications';
 import {
   listKBItems,
   createKBItem,
@@ -12,6 +13,7 @@ import {
 const CATEGORIES = ['Logo Reference', 'Style Guide', 'Typography', 'Color Palette', 'Industry Example', 'Other'];
 
 export default function KnowledgeBasePage() {
+  const { confirm } = useNotifications();
   const [items, setItems] = useState<AdminKBItem[]>([]);
   const [uploading, setUploading] = useState(false);
   const [filterCategory, setFilterCategory] = useState<string>('all');
@@ -74,7 +76,7 @@ export default function KnowledgeBasePage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Delete this reference image? This cannot be undone.')) return;
+    if (!await confirm({ title: 'Delete reference image?', message: 'This image will be permanently removed from the knowledge base.', confirmLabel: 'Delete image', tone: 'danger' })) return;
     try {
       await deleteKBItem(id);
       setItems((prev) => prev.filter((i) => i.id !== id));

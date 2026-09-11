@@ -5,6 +5,7 @@ import { WizardData, LogoResult, QualityScore } from '@/lib/types';
 import { generateLogo, reviewLogo } from '@/lib/api';
 import WizardContainer from '@/components/wizard/WizardContainer';
 import LogoResultView from '@/components/LogoResultView';
+import { useNotifications } from '@/components/Notifications';
 
 const showcaseWords = [
   { name: 'Aster', className: 'font-serif italic' },
@@ -29,6 +30,7 @@ const pricingPlans = [
 ];
 
 export default function Home() {
+  const { confirm } = useNotifications();
   const [view, setView] = useState<'wizard' | 'result'>('wizard');
   const [wizardData, setWizardData] = useState<WizardData | null>(null);
   const [research, setResearch] = useState('');
@@ -164,7 +166,7 @@ export default function Home() {
 
   const handleRegenerate = async () => {
     if (!wizardData) return;
-    if (!window.confirm('Regenerating uses 1 credit. Continue?')) return;
+    if (!await confirm({ title: 'Regenerate this logo?', message: 'A fresh variation will use 1 credit.', confirmLabel: 'Use 1 credit' })) return;
     setIsGenerating(true);
     setError(null);
     try {
@@ -205,7 +207,7 @@ export default function Home() {
   const handleIterate = async () => {
     if (!qualityReview || !logo || !wizardData) return;
     if (iteration >= maxIterations) return setError(`Maximum of ${maxIterations} revisions reached for this logo.`);
-    if (!window.confirm('Creating this revision uses 1 credit. Continue?')) return;
+    if (!await confirm({ title: 'Create this revision?', message: 'Applying these improvements will use 1 credit.', confirmLabel: 'Create revision' })) return;
     setIsGenerating(true);
     setError(null);
     try {
