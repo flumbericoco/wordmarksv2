@@ -18,13 +18,25 @@ interface FunctionContext {
   env: Env;
 }
 
+function parseTags(value: unknown): string[] {
+  if (Array.isArray(value)) return value.filter((item): item is string => typeof item === 'string');
+  if (typeof value !== 'string' || !value.trim()) return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (Array.isArray(parsed)) return parsed.filter((item): item is string => typeof item === 'string');
+  } catch {
+    // Preserve legacy comma-separated tags without making the admin page fail.
+  }
+  return value.split(',').map((tag) => tag.trim()).filter(Boolean);
+}
+
 // Redact large image data in list responses
 function redactItem(row: Record<string, unknown>, includeImage = false) {
   const item: Record<string, unknown> = {
     id: row.id,
     filename: row.filename,
     category: row.category,
-    tags: typeof row.tags === 'string' ? JSON.parse(row.tags || '[]') : row.tags,
+    tags: parseTags(row.tags),
     description: row.description,
     imageUrl: row.image_url,
     kind: row.image_data ? 'image' : 'document',
