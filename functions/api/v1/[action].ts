@@ -230,7 +230,15 @@ async function handleGenerate(
 
     const providerHost = new URL(provider.baseUrl).hostname;
     const effectiveImageModel = provider.imageModel || (providerHost === 'api.pesatrouter.com' ? provider.textModel : '');
-    const useSvgGeneration = !effectiveImageModel || effectiveImageModel.toLowerCase() === 'svg';
+    // PesatRouter currently exposes its pesat-* models through
+    // /v1/chat/completions only. Treating those model names as raster image
+    // models eventually falls through to /images/generations, which the
+    // provider rejects. Keep them on the supported vector pipeline; a true
+    // image model can still be configured explicitly for providers that
+    // expose an image-generation endpoint.
+    const useSvgGeneration = !effectiveImageModel
+      || effectiveImageModel.toLowerCase() === 'svg'
+      || (providerHost === 'api.pesatrouter.com' && /^pesat-/i.test(effectiveImageModel));
     const generationSettings = creatorSettings;
     let selectedReview: import('../../lib/types').QualityScore | undefined;
     // pesat-pro is used for strategy and review. Long SVG responses from it
