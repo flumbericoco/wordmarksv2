@@ -77,7 +77,7 @@ async function getActiveProvider(db: D1Database, env: Env): Promise<{
     return {
       apiKey: env.OPENAI_API_KEY,
       baseUrl: 'https://api.pesatrouter.com/v1',
-      textModel: 'pesat-flash',
+      textModel: 'pesat-pro',
       imageModel: 'dall-e-3',
     };
   }

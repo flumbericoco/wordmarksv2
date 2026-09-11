@@ -44,7 +44,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     ? await timed(() => fetch('https://api.pesatrouter.com/v1/chat/completions', {
         method: 'POST',
         headers: { Authorization: `Bearer ${env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'pesat-flash', messages: [{ role: 'user', content: 'Reply OK' }], max_tokens: 2 }),
+        body: JSON.stringify({ model: 'pesat-pro', messages: [{ role: 'user', content: 'Reply OK' }], max_tokens: 2 }),
       }))
     : { status: 'missing', detail: 'OPENAI_API_KEY is not configured' };
 
