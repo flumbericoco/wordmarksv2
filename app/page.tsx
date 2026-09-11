@@ -288,7 +288,7 @@ export default function Home() {
             <a href="/developers" className="hidden text-xs font-semibold uppercase tracking-[0.16em] transition-opacity hover:opacity-50 md:block">Developers</a>
             <a href="#pricing" className="hidden text-xs font-semibold uppercase tracking-[0.16em] transition-opacity hover:opacity-50 lg:block">Pricing</a>
             <a href="/admin" className="hidden text-xs font-semibold uppercase tracking-[0.16em] transition-opacity hover:opacity-50 sm:block">Admin</a>
-            <a href="/account" className="hidden rounded-full border border-black/15 px-4 py-2 text-xs font-bold sm:block">{account ? `${account.credits} credits` : 'Sign in'}</a>
+            <a href="/account" className="hidden rounded-full border border-black/15 px-4 py-2 text-xs font-bold sm:block">{account ? `${account.credits} ${account.credits === 1 ? 'credit' : 'credits'}` : 'Sign in'}</a>
             <a href="#create" className="rounded-full bg-[#171714] px-5 py-2.5 text-xs font-bold uppercase tracking-[0.12em] text-white transition-transform hover:-translate-y-0.5">Create yours</a>
           </nav>
         </div>

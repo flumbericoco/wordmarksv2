@@ -223,6 +223,11 @@ async function handleGenerate(
     const settingsRows = await db.prepare("SELECT key,value FROM settings WHERE key IN ('imageQuality','imageSize')").all<{ key: string; value: string }>();
     const generationSettings = Object.fromEntries(settingsRows.results.map((row) => [row.key, row.value]));
     let selectedReview: import('../../lib/types').QualityScore | undefined;
+    // pesat-pro is used for strategy and review. Long SVG responses from it
+    // exceed the Pages request window, so SVG candidates use the fast renderer.
+    const svgProvider = provider.textModel === 'pesat-pro'
+      ? { ...provider, textModel: 'pesat-flash' }
+      : provider;
     const result = useSvgGeneration
       ? await (async () => {
           const directions = [
@@ -230,11 +235,8 @@ async function handleGenerate(
             'Explore an ownable abstract metaphor derived from the brand purpose. Favor one bold silhouette and exceptional optical balance.',
             'Explore a distinctive letterform or ligature concept while keeping the full name immediately readable and professionally kerned.',
           ];
-          if (provider.textModel === 'pesat-pro') {
-            return generateSvgWordmark(`${prompt}\nART DIRECTION: ${directions[0]}`, body.brandName, provider);
-          }
           const candidates = await Promise.all(directions.map((direction, index) =>
-            generateSvgWordmark(`${prompt}\nCANDIDATE ${index + 1} ART DIRECTION: ${direction}`, body.brandName, provider)
+            generateSvgWordmark(`${prompt}\nCANDIDATE ${index + 1} ART DIRECTION: ${direction}`, body.brandName, svgProvider)
           ));
           const scored = await Promise.all(candidates.map(async (candidate) => {
             try {
@@ -426,38 +428,40 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         if (!internalMcpCall && !user) {
           return Response.json({ error: 'Sign in and add credits before generating a logo', requestId }, { status: 401 });
         }
-        let reserved = false;
         if (user) {
-          const debitReference = `web-generation:${requestId}`;
-          const debit = await env.DB.prepare(
-            "UPDATE users SET credits=credits-1, updated_at=datetime('now') WHERE id=? AND credits>0"
-          ).bind(user.id).run();
-          if (!debit.meta.changes) {
+          const balance = await env.DB.prepare('SELECT credits FROM users WHERE id=?').bind(user.id).first<{ credits: number }>();
+          if (!balance || balance.credits < 1) {
             return Response.json({ error: 'Insufficient credits', requestId }, { status: 402 });
-          }
-          try {
-            await env.DB.prepare(
-              'INSERT INTO credit_ledger (id,user_id,amount,reason,reference) VALUES (?,?, -1,?,?)'
-            ).bind(crypto.randomUUID(), user.id, 'logo_generation', debitReference).run();
-            reserved = true;
-          } catch (error) {
-            await env.DB.prepare("UPDATE users SET credits=credits+1, updated_at=datetime('now') WHERE id=?").bind(user.id).run();
-            throw error;
           }
         }
         try {
           const ownerId = user?.id || (internalMcpCall ? request.headers.get('X-Wordmarks-User-ID') || undefined : undefined);
           data = await handleGenerate(validated.data, provider, env.DB, env.GENERATED_BUCKET, requestId, waitUntil, ownerId);
-        } catch (error) {
-          if (user && reserved) {
-            await env.DB.batch([
-              env.DB.prepare("UPDATE users SET credits=credits+1, updated_at=datetime('now') WHERE id=?").bind(user.id),
-              env.DB.prepare('INSERT OR IGNORE INTO credit_ledger (id,user_id,amount,reason,reference) VALUES (?,?,1,?,?)')
-                .bind(crypto.randomUUID(), user.id, 'generation_refund', `refund:${requestId}`),
-            ]);
+          if (user) {
+            const debit = await env.DB.prepare(
+              "UPDATE users SET credits=credits-1, updated_at=datetime('now') WHERE id=? AND credits>0"
+            ).bind(user.id).run();
+            if (!debit.meta.changes) {
+              const generated = data as { generationId?: string };
+              if (generated.generationId) {
+                await env.DB.prepare(
+                  "UPDATE generation_jobs SET status='failed', result_url=NULL, error='Credit unavailable after concurrent generation' WHERE id=?"
+                ).bind(generated.generationId).run();
+              }
+              return Response.json({ error: 'Insufficient credits', requestId }, { status: 402 });
+            }
+            try {
+              await env.DB.prepare(
+                'INSERT INTO credit_ledger (id,user_id,amount,reason,reference) VALUES (?,?, -1,?,?)'
+              ).bind(crypto.randomUUID(), user.id, 'logo_generation', `web-generation:${requestId}`).run();
+            } catch (error) {
+              await env.DB.prepare("UPDATE users SET credits=credits+1, updated_at=datetime('now') WHERE id=?").bind(user.id).run();
+              throw error;
+            }
           }
+        } catch (error) {
           const message = error instanceof Error ? error.message : 'Generation failed';
-          throw new ProviderError(`${message}. Your credit was automatically refunded.`);
+          throw new ProviderError(`${message}. No credit was charged.`);
         }
         break;
       }
