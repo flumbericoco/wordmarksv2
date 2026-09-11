@@ -162,6 +162,17 @@ export default function AccountPage() {
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Billing portal unavailable'); setBusy(false); }
   }
 
+  async function cancelSubscriptionNow() {
+    if (!window.confirm('End this subscription immediately? Future renewals will stop. Existing credits will remain available.')) return;
+    setBusy(true); setMessage('');
+    try {
+      await api('billing/cancel-now', { method: 'POST' });
+      setMessage('Subscription cancelled immediately. Your existing credits remain available.');
+      await load();
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Unable to cancel subscription'); }
+    finally { setBusy(false); }
+  }
+
   async function topup() {
     setBusy(true); setMessage('');
     try { const result = await api<{url:string}>('billing/topup',{method:'POST'}); window.location.assign(result.url); }
@@ -244,8 +255,8 @@ export default function AccountPage() {
               {billing.subscription ? <span className="rounded-full bg-[#c6ff4a] px-3 py-1 text-[10px] font-black uppercase">{billing.subscription.status}</span> : null}
             </div>
             {billing.subscription?.currentPeriodEnd ? <p className="mt-4 text-sm text-black/55">{billing.subscription.cancelAtPeriodEnd ? 'Access until' : 'Next billing date'}: {new Date(billing.subscription.currentPeriodEnd).toLocaleDateString()}</p> : <p className="mt-4 text-sm text-black/45">{billing.subscription ? 'Billing schedule is available in the Stripe portal.' : 'Choose a plan above to activate monthly credits.'}</p>}
-            {billing.subscription?.cancelAtPeriodEnd ? <p className="mt-2 text-sm font-bold text-orange-700">Cancellation scheduled at the end of this period.</p> : null}
-            {billing.subscription ? <button disabled={busy} onClick={openBillingPortal} className="mt-5 rounded-full bg-[#171714] px-5 py-3 text-xs font-black uppercase tracking-wider text-white disabled:opacity-50">Manage billing</button> : null}
+            {billing.subscription?.cancelAtPeriodEnd ? <p className="mt-2 text-sm font-bold text-orange-700">Cancellation is scheduled, but access remains active until the date above.</p> : null}
+            {billing.subscription ? <div className="mt-5 flex flex-wrap gap-3"><button disabled={busy} onClick={openBillingPortal} className="rounded-full bg-[#171714] px-5 py-3 text-xs font-black uppercase tracking-wider text-white disabled:opacity-50">Manage billing</button>{billing.subscription.cancelAtPeriodEnd ? <button disabled={busy} onClick={cancelSubscriptionNow} className="rounded-full border border-red-600 px-5 py-3 text-xs font-black uppercase tracking-wider text-red-700 disabled:opacity-50">End subscription now</button> : null}</div> : null}
           </div>
           <div className="rounded-[2rem] border border-black/10 bg-white/60 p-7">
             <p className="text-xs font-black uppercase tracking-[0.18em] text-[#5b42d5]">Recent credit activity</p>

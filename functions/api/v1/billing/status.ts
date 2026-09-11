@@ -33,7 +33,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   }
 
   const local = await env.DB.prepare(
-    'SELECT stripe_subscription_id, plan, status, current_period_end, updated_at FROM subscriptions WHERE user_id = ? ORDER BY updated_at DESC LIMIT 1'
+    "SELECT stripe_subscription_id, plan, status, current_period_end, updated_at FROM subscriptions WHERE user_id = ? AND status IN ('active','trialing','past_due') ORDER BY updated_at DESC LIMIT 1"
   ).bind(user.id).first<Record<string, unknown>>();
 
   let subscription = local ? {
