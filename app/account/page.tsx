@@ -41,6 +41,9 @@ export default function AccountPage() {
   const [message, setMessage] = useState(() => {
     if (typeof window === 'undefined') return '';
     const checkoutState = new URLSearchParams(window.location.search).get('checkout');
+    const verificationState = new URLSearchParams(window.location.search).get('verification');
+    if (new URLSearchParams(window.location.search).get('verified') === '1') return 'Email verified. Your account is now active.';
+    if (verificationState === 'invalid') return 'This verification link is invalid or expired. Sign in and request a new one.';
     if (checkoutState === 'success') return 'Payment received. Credits may take a few seconds to appear.';
     if (checkoutState === 'cancelled') return 'Checkout cancelled. You were not charged.';
     return '';
@@ -48,6 +51,7 @@ export default function AccountPage() {
   const [busy, setBusy] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [showRevokedKeys, setShowRevokedKeys] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState('');
 
   const load = useCallback(async (reconcile = false) => {
     try {
@@ -108,11 +112,21 @@ export default function AccountPage() {
   async function submitAuth(event: FormEvent) {
     event.preventDefault(); setBusy(true); setMessage('');
     try {
-      await api(`account/${mode}`, { method: 'POST', body: JSON.stringify({ email, password }) });
+      const result = await api<{ verificationRequired?: boolean; email?: string; message?: string }>(`account/${mode}`, { method: 'POST', body: JSON.stringify({ email, password }) });
+      if (result.verificationRequired) {
+        setVerificationEmail(result.email || email);
+        setMessage(result.message || 'Check your email to activate your account.');
+        setPassword('');
+        return;
+      }
       setPassword(''); await load();
       const next = new URLSearchParams(window.location.search).get('next');
       if (next?.startsWith('/') && !next.startsWith('//')) window.location.assign(next);
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'Unable to continue'); }
+    } catch (error) {
+      const text = error instanceof Error ? error.message : 'Unable to continue';
+      if (text.toLowerCase().includes('verify your email')) setVerificationEmail(email);
+      setMessage(text);
+    }
     finally { setBusy(false); }
   }
 
@@ -123,6 +137,16 @@ export default function AccountPage() {
       const result = await api<{ message: string }>('account/request-reset', { method: 'POST', body: JSON.stringify({ email }) });
       setMessage(result.message || 'Check your inbox for a reset link.');
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Unable to request reset'); }
+    finally { setBusy(false); }
+  }
+
+  async function resendVerification() {
+    if (!verificationEmail) return;
+    setBusy(true); setMessage('');
+    try {
+      const result = await api<{ message: string }>('account/resend-verification', { method: 'POST', body: JSON.stringify({ email: verificationEmail }) });
+      setMessage(result.message || 'A new verification email has been sent.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Unable to resend verification'); }
     finally { setBusy(false); }
   }
 
@@ -200,6 +224,18 @@ export default function AccountPage() {
   }
 
   if (!user) {
+    if (verificationEmail) return (
+      <main className="grid min-h-screen place-items-center bg-[#d9d3ff] px-5 py-16 text-[#171714]">
+        <div className="w-full max-w-md rounded-[2rem] border border-black/10 bg-[#f2f0e9] p-8 text-center shadow-2xl">
+          <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-[#c6ff4a] text-3xl">✉</div>
+          <h1 className="mt-6 text-4xl font-black tracking-[-0.06em]">Check your email.</h1>
+          <p className="mt-4 text-sm leading-6 text-black/55">We sent an activation link to <strong className="text-black">{verificationEmail}</strong>. Open it within 24 hours before signing in or generating a logo.</p>
+          {message ? <p role="status" className="mt-4 rounded-xl bg-black/[0.05] px-4 py-3 text-sm">{message}</p> : null}
+          <button disabled={busy} onClick={resendVerification} className="mt-6 w-full rounded-full bg-[#171714] px-5 py-3.5 text-sm font-black text-white disabled:opacity-50">{busy ? 'Sending…' : 'Resend verification email'}</button>
+          <button onClick={() => { setVerificationEmail(''); setMode('login'); setMessage(''); }} className="mt-4 text-sm text-black/50 underline underline-offset-4">Back to sign in</button>
+        </div>
+      </main>
+    );
     return (
       <main className="grid min-h-screen place-items-center bg-[#d9d3ff] px-5 py-16 text-[#171714]">
         <div className="w-full max-w-md rounded-[2rem] border border-black/10 bg-[#f2f0e9] p-7 shadow-2xl sm:p-9">

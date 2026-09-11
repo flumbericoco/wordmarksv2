@@ -23,6 +23,26 @@ async function sendEmail(env: Env, to: string, subject: string, html: string, id
   return true;
 }
 
+const pendingVerificationKey = (userId: string) => `email-pending:${userId}`;
+
+async function issueVerificationEmail(env: Env, origin: string, userId: string, email: string): Promise<boolean> {
+  const token = randomToken();
+  const tokenHash = await sha256(token);
+  await env.DB.batch([
+    env.DB.prepare("UPDATE auth_tokens SET used_at=datetime('now') WHERE user_id=? AND purpose='email_verification' AND used_at IS NULL").bind(userId),
+    env.DB.prepare("INSERT INTO auth_tokens(id,user_id,token_hash,purpose,expires_at) VALUES(?,?,?,'email_verification',datetime('now','+24 hours'))")
+      .bind(crypto.randomUUID(), userId, tokenHash),
+  ]);
+  const url = `${origin}/api/v1/account/verify-email?token=${encodeURIComponent(token)}`;
+  return sendEmail(
+    env,
+    email,
+    'Verify your Wordmarks account',
+    `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:32px"><h1 style="font-size:26px">Verify your email</h1><p>Confirm this email address to activate your Wordmarks account and start using the logo generator.</p><p style="margin:28px 0"><a href="${url}" style="background:#171714;color:#fff;padding:14px 22px;border-radius:999px;text-decoration:none;font-weight:700">Verify email</a></p><p style="color:#777;font-size:13px">This secure link expires in 24 hours and can only be used once.</p></div>`,
+    `verify-${tokenHash}`,
+  );
+}
+
 export const onRequest: PagesFunction<Env> = async ({ request, env, params }) => {
   const action = String((params as { action?: string }).action || '');
 
@@ -59,6 +79,34 @@ export const onRequest: PagesFunction<Env> = async ({ request, env, params }) =>
     return json({ ok: true });
   }
 
+  if (action === 'verify-email' && request.method === 'GET') {
+    const token = new URL(request.url).searchParams.get('token') || '';
+    if (token.length < 32 || token.length > 512) return Response.redirect(`${new URL(request.url).origin}/account?verification=invalid`, 302);
+    const found = await env.DB.prepare("SELECT id,user_id FROM auth_tokens WHERE token_hash=? AND purpose='email_verification' AND used_at IS NULL AND expires_at>datetime('now')")
+      .bind(await sha256(token)).first<{ id: string; user_id: string }>();
+    if (!found) return Response.redirect(`${new URL(request.url).origin}/account?verification=invalid`, 302);
+    const sessionToken = randomToken();
+    await env.DB.batch([
+      env.DB.prepare("UPDATE auth_tokens SET used_at=datetime('now') WHERE id=?").bind(found.id),
+      env.DB.prepare('DELETE FROM settings WHERE key=?').bind(pendingVerificationKey(found.user_id)),
+      env.DB.prepare("INSERT INTO user_sessions(id,user_id,token_hash,expires_at) VALUES(?,?,?,datetime('now','+30 days'))")
+        .bind(crypto.randomUUID(), found.user_id, await sha256(sessionToken)),
+    ]);
+    await recordAudit(env.DB, `user:${found.user_id}`, 'verify_email', 'user', found.user_id);
+    return new Response(null, { status: 302, headers: { Location: `${new URL(request.url).origin}/account?verified=1`, 'Set-Cookie': sessionCookie(sessionToken) } });
+  }
+
+  if (action === 'resend-verification' && request.method === 'POST') {
+    const body = await bodyOf(request);
+    const email = String(body.email || '').trim().toLowerCase();
+    if (email.length <= 254) {
+      const found = await env.DB.prepare("SELECT u.id,u.email FROM users u JOIN settings s ON s.key=('email-pending:' || u.id) WHERE u.email=? LIMIT 1")
+        .bind(email).first<{ id: string; email: string }>();
+      if (found) await issueVerificationEmail(env, new URL(request.url).origin, found.id, found.email).catch(() => false);
+    }
+    return json({ ok: true, message: 'If verification is pending, a new email has been sent.' });
+  }
+
   if (action === 'register' && request.method === 'POST') {
     const body = await bodyOf(request);
     const email = String(body.email || '').trim().toLowerCase();
@@ -73,13 +121,13 @@ export const onRequest: PagesFunction<Env> = async ({ request, env, params }) =>
     const id = crypto.randomUUID();
     const salt = randomToken(16);
     const passwordHash = await hashPassword(password, salt);
-    const token = randomToken();
-    const tokenHash = await sha256(token);
     await env.DB.batch([
       env.DB.prepare('INSERT INTO users (id, email, password_hash, password_salt, credits) VALUES (?, ?, ?, ?, 0)').bind(id, email, passwordHash, salt),
-      env.DB.prepare("INSERT INTO user_sessions (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, datetime('now', '+30 days'))").bind(crypto.randomUUID(), id, tokenHash),
+      env.DB.prepare("INSERT INTO settings(key,value,updated_at) VALUES(?,?,datetime('now'))").bind(pendingVerificationKey(id), email),
     ]);
-    return json({ ok: true, user: { id, email, plan: 'none', credits: 0 } }, 201, { 'Set-Cookie': sessionCookie(token) });
+    const emailSent = await issueVerificationEmail(env, new URL(request.url).origin, id, email).catch(() => false);
+    await recordAudit(env.DB, `user:${id}`, 'registration_pending_verification', 'user', id, { emailSent });
+    return json({ ok: true, verificationRequired: true, emailSent, email, message: emailSent ? 'Check your email to activate your account.' : 'Account created, but verification email could not be sent. Use resend verification.' }, 201);
   }
 
   if (action === 'login' && request.method === 'POST') {
@@ -91,6 +139,8 @@ export const onRequest: PagesFunction<Env> = async ({ request, env, params }) =>
     if (!user || await hashPassword(password, String(user.password_salt)) !== String(user.password_hash)) {
       return json({ error: 'Invalid email or password' }, 401);
     }
+    const pending = await env.DB.prepare('SELECT key FROM settings WHERE key=?').bind(pendingVerificationKey(String(user.id))).first();
+    if (pending) return json({ error: 'Verify your email before signing in.', code: 'EMAIL_NOT_VERIFIED', verificationRequired: true, email }, 403);
     const token = randomToken();
     await env.DB.prepare("INSERT INTO user_sessions (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, datetime('now', '+30 days'))")
       .bind(crypto.randomUUID(), user.id, await sha256(token)).run();

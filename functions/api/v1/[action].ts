@@ -415,6 +415,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     if (!user && !(internalMcpCall && action === 'generate-logo')) {
       return Response.json({ error: 'Authentication required', requestId }, { status: 401 });
     }
+    if (user) {
+      const pendingVerification = await env.DB.prepare('SELECT key FROM settings WHERE key=?')
+        .bind(`email-pending:${user.id}`).first();
+      if (pendingVerification) return Response.json({ error: 'Verify your email before using the generator.', code: 'EMAIL_NOT_VERIFIED', requestId }, { status: 403 });
+    }
 
     // Get active provider
     const provider = await getActiveProvider(env.DB, env);
