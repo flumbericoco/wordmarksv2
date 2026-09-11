@@ -150,7 +150,8 @@ async function generateSvgWordmark(
   provider: { apiKey: string; baseUrl: string; textModel: string },
 ): Promise<{ url: string }> {
   let lastError: Error | null = null;
-  for (let attempt = 0; attempt < 3; attempt++) {
+  const maxAttempts = provider.textModel === 'pesat-pro' ? 1 : 3;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const correction = attempt > 0
       ? ' Previous output failed logo-quality validation. Return a simpler flat logo only: one compact symbol directly beside one contiguous brand-name wordmark. Remove all backgrounds, frames, grids, taglines, labels, metadata, slogans, glow, filters, patterns and decorative presentation elements. Never separate parts of the brand name with distant absolute x positions.'
       : '';
@@ -229,6 +230,9 @@ async function handleGenerate(
             'Explore an ownable abstract metaphor derived from the brand purpose. Favor one bold silhouette and exceptional optical balance.',
             'Explore a distinctive letterform or ligature concept while keeping the full name immediately readable and professionally kerned.',
           ];
+          if (provider.textModel === 'pesat-pro') {
+            return generateSvgWordmark(`${prompt}\nART DIRECTION: ${directions[0]}`, body.brandName, provider);
+          }
           const candidates = await Promise.all(directions.map((direction, index) =>
             generateSvgWordmark(`${prompt}\nCANDIDATE ${index + 1} ART DIRECTION: ${direction}`, body.brandName, provider)
           ));
