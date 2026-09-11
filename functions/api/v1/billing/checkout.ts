@@ -3,7 +3,6 @@ import { getUserSession } from '../user-auth';
 interface Env {
   DB: D1Database;
   STRIPE_SECRET_KEY?: string;
-  STRIPE_PRICE_INITIAL_25?: string;
   STRIPE_PRICE_LITE?: string;
   STRIPE_PRICE_GROWTH?: string;
   STRIPE_PRICE_PRO?: string;
@@ -18,17 +17,13 @@ const priceKeys = {
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const user = await getUserSession(request, env.DB);
   if (!user) return Response.json({ error: 'Authentication required' }, { status: 401 });
-  const missingConfiguration = [
-    !env.STRIPE_SECRET_KEY && 'STRIPE_SECRET_KEY',
-    !env.STRIPE_PRICE_INITIAL_25 && 'STRIPE_PRICE_INITIAL_25',
-  ].filter(Boolean);
+  const missingConfiguration = [!env.STRIPE_SECRET_KEY && 'STRIPE_SECRET_KEY'].filter(Boolean);
   if (missingConfiguration.length > 0) {
     return Response.json({
       error: `Billing configuration missing: ${missingConfiguration.join(', ')}`,
     }, { status: 503 });
   }
   const stripeSecretKey = env.STRIPE_SECRET_KEY as string;
-  const initialPriceId = env.STRIPE_PRICE_INITIAL_25 as string;
   const body: { plan?: string } = await request.json<{ plan?: string }>().catch(() => ({}));
   const plan = String(body.plan || '').toLowerCase() as keyof typeof priceKeys;
   const priceKey = priceKeys[plan];
@@ -50,15 +45,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     mode: 'subscription',
     success_url: `${origin}/account?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/account?checkout=cancelled`,
-    'line_items[0][price]': initialPriceId,
+    'line_items[0][price]': priceId,
     'line_items[0][quantity]': '1',
-    'line_items[1][price]': priceId,
-    'line_items[1][quantity]': '1',
     'metadata[user_id]': user.id,
     'metadata[plan]': plan,
     'metadata[kind]': 'subscription',
-    // The $25 one-time item is charged today. The recurring plan starts in 30 days.
-    'subscription_data[trial_period_days]': '30',
     'subscription_data[metadata][user_id]': user.id,
     'subscription_data[metadata][plan]': plan,
   });

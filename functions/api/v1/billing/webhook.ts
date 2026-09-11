@@ -80,7 +80,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         .bind(crypto.randomUUID(),userId,String(object.id),String(object.payment_intent||''),'topup',Number(object.amount_total||0),String(object.currency||'usd'),25).run();
     }
     if (userId && plan && paymentStatus === 'paid') {
-      await addCredits(env.DB, userId, 25, 'initial_credit_pack', `checkout:${String(object.id)}`);
+      const activationCredits = monthlyCredits[plan] || 0;
+      await addCredits(env.DB, userId, activationCredits, 'subscription_activation', `checkout:${String(object.id)}`);
       await env.DB.batch([
         env.DB.prepare("UPDATE users SET plan = ?, stripe_customer_id = ?, updated_at = datetime('now') WHERE id = ?")
           .bind(plan, String(object.customer || ''), userId),
@@ -94,7 +95,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
            (id,user_id,stripe_checkout_id,stripe_payment_intent_id,kind,amount,currency,credits,status)
            VALUES (?,?,?,?,?,?,?,?, 'paid')
            ON CONFLICT(stripe_checkout_id) DO UPDATE SET status='paid', updated_at=datetime('now')`
-        ).bind(crypto.randomUUID(), userId, String(object.id), String(object.payment_intent || ''), 'initial_pack', Number(object.amount_total || 0), String(object.currency || 'usd'), 25),
+        ).bind(crypto.randomUUID(), userId, String(object.id), String(object.payment_intent || ''), 'subscription_activation', Number(object.amount_total || 0), String(object.currency || 'usd'), activationCredits),
       ]);
     }
   }

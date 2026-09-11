@@ -231,7 +231,7 @@ export default function AccountPage() {
                 </button>
               ))}
             </div>
-            <p className="mt-4 text-xs leading-5 text-black/55"><strong>$25 is charged today</strong> for 25 credits. Your selected monthly plan starts after the 30-day introductory period, then renews monthly until cancelled.</p>
+            <p className="mt-4 text-xs leading-5 text-black/55">Your selected plan is <strong>charged today</strong>, adds its monthly credits immediately, and renews monthly until cancelled. Need more? Top up 25 credits separately for $25.</p>
             {billing.subscription ? <p className="mt-2 text-xs font-bold text-[#5b42d5]">You already have a plan. Use Manage billing below to change or cancel it.</p> : null}
           </div>
         </section>

@@ -20,18 +20,21 @@ export async function fulfillPaidCheckout(db: D1Database, session: StripeCheckou
   const plan = metadata.plan;
   if (kind !== 'topup' && !(kind === 'subscription' && plan)) throw new Error('Invalid checkout metadata');
 
+  const monthlyCredits: Record<string, number> = { lite: 1, growth: 4, pro: 10, scale: 28 };
+  const credits = kind === 'topup' ? 25 : monthlyCredits[String(plan)] || 0;
+  if (!credits) throw new Error('Invalid checkout plan');
   const reference = `checkout:${sessionId}`;
   const existing = await db.prepare('SELECT id FROM credit_ledger WHERE reference=?').bind(reference).first();
   if (existing) return { fulfilled: true, alreadyProcessed: true, paymentStatus: 'paid' };
 
   const statements = [
     db.prepare('INSERT INTO credit_ledger(id,user_id,amount,reason,reference) VALUES(?,?,?,?,?)')
-      .bind(crypto.randomUUID(), expectedUserId, 25, kind === 'topup' ? 'credit_topup' : 'initial_credit_pack', reference),
-    db.prepare("UPDATE users SET credits=credits+25, updated_at=datetime('now') WHERE id=?").bind(expectedUserId),
+      .bind(crypto.randomUUID(), expectedUserId, credits, kind === 'topup' ? 'credit_topup' : 'subscription_activation', reference),
+    db.prepare("UPDATE users SET credits=credits+?, updated_at=datetime('now') WHERE id=?").bind(credits, expectedUserId),
     db.prepare(`INSERT INTO payment_transactions
       (id,user_id,stripe_checkout_id,stripe_payment_intent_id,kind,amount,currency,credits,status)
       VALUES(?,?,?,?,?,?,?,?, 'paid')`)
-      .bind(crypto.randomUUID(), expectedUserId, sessionId, String(session.payment_intent || ''), kind === 'topup' ? 'topup' : 'initial_pack', Number(session.amount_total || 0), String(session.currency || 'usd'), 25),
+      .bind(crypto.randomUUID(), expectedUserId, sessionId, String(session.payment_intent || ''), kind === 'topup' ? 'topup' : 'subscription_activation', Number(session.amount_total || 0), String(session.currency || 'usd'), credits),
   ];
 
   if (kind === 'subscription' && plan) {
