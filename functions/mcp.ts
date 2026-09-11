@@ -46,11 +46,17 @@ function jsonRpcError(id: JsonRpcRequest['id'], code: number, message: string, s
   });
 }
 
-function svgContent(imageUrl: unknown): { type: 'image'; data: string; mimeType: string } | null {
+function decodeSvg(imageUrl: unknown): string | null {
   if (typeof imageUrl !== 'string' || !imageUrl.startsWith('data:image/svg+xml')) return null;
   const comma = imageUrl.indexOf(',');
   if (comma < 0) return null;
-  const svg = decodeURIComponent(imageUrl.slice(comma + 1));
+  const svg = decodeURIComponent(imageUrl.slice(comma + 1)).trim();
+  // Never let an HTML/error document masquerade as a downloadable logo.
+  if (!svg.startsWith('<svg') || !svg.endsWith('</svg>') || /<!doctype\s+html|<html\b|<body\b/i.test(svg)) return null;
+  return svg;
+}
+
+function svgContent(svg: string): { type: 'image'; data: string; mimeType: string } {
   const bytes = new TextEncoder().encode(svg);
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
@@ -166,18 +172,41 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     }
 
     const data = payload.data as Record<string, unknown>;
-    const image = svgContent(data.imageUrl);
+    const svg = decodeSvg(data.imageUrl);
+    if (!svg) {
+      await env.DB.batch([
+        env.DB.prepare("UPDATE users SET credits = credits + 1, updated_at=datetime('now') WHERE id = ?").bind(apiUser.id),
+        env.DB.prepare('INSERT OR IGNORE INTO credit_ledger (id,user_id,amount,reason,reference) VALUES (?,?,?,?,?)')
+          .bind(crypto.randomUUID(), apiUser.id, 1, 'generation_refund', `refund:${spendReference}`),
+      ]);
+      return jsonRpc(rpc.id, {
+        content: [{ type: 'text', text: 'The provider returned an invalid logo document. Your credit was refunded.' }],
+        isError: true,
+      });
+    }
+    const image = svgContent(svg);
+    const generationId = typeof data.generationId === 'string' ? data.generationId : crypto.randomUUID();
+    const toolArgs = args as Record<string, unknown>;
     const summary = {
       status: 'Logo generated successfully',
-      generationId: data.generationId,
-      ...(image ? {} : { imageUrl: data.imageUrl }),
+      generationId,
+      filename: `${String(toolArgs.brandName || 'wordmark').replace(/[^a-z0-9-]+/gi, '-').toLowerCase()}-${generationId.slice(0, 8)}.svg`,
+      mimeType: 'image/svg+xml',
     };
     return jsonRpc(rpc.id, {
       content: [
         { type: 'text', text: JSON.stringify(summary, null, 2) },
-        ...(image ? [image] : []),
+        image,
+        {
+          type: 'resource',
+          resource: {
+            uri: `wordmarks://generation/${generationId}.svg`,
+            mimeType: 'image/svg+xml',
+            text: svg,
+          },
+        },
       ],
-      structuredContent: data,
+      structuredContent: { ...data, imageUrl: undefined, ...summary },
     });
   }
 
