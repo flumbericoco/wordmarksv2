@@ -8,7 +8,7 @@ interface ApiKey { id: string; name: string; key_prefix: string; created_at: str
 interface Subscription { id: string; plan: string; status: string; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean }
 interface Invoice { id: string; number: string; status: string; amountPaid: number; currency: string; createdAt: string; hostedUrl: string | null }
 interface CreditEntry { id: string; amount: number; reason: string; created_at: string }
-interface BillingData { subscription: Subscription | null; invoices: Invoice[]; creditHistory: CreditEntry[] }
+interface BillingData { subscription: Subscription | null; invoices: Invoice[]; creditHistory: CreditEntry[]; reconciliation?: { fulfilled?: boolean; paymentStatus?: string } | null }
 interface Generation { id:string; brand_name:string; status:string; model:string; result_url?:string; error?:string; created_at:string }
 
 class ApiRequestError extends Error {
@@ -47,7 +47,7 @@ export default function AccountPage() {
   const [deletePassword, setDeletePassword] = useState('');
   const [showRevokedKeys, setShowRevokedKeys] = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (reconcile = false) => {
     try {
       const me = await api<{ user: User }>('account/me');
       setUser(me.user);
@@ -58,8 +58,18 @@ export default function AccountPage() {
         if (reason instanceof ApiRequestError && reason.status === 401) setUser(null);
       }
       try {
-        const billingData = await api<BillingData>('billing/status');
+        const params = new URLSearchParams(window.location.search);
+        const sessionId = params.get('session_id');
+        const query = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : reconcile ? '?reconcile=1' : '';
+        const billingData = await api<BillingData>(`billing/status${query}`);
         setBilling(billingData);
+        if (billingData.reconciliation?.fulfilled) {
+          const refreshed = await api<{ user: User }>('account/me');
+          setUser(refreshed.user);
+          setMessage('Payment confirmed. Your credits are ready.');
+        } else if (reconcile && billingData.reconciliation?.paymentStatus === 'not_found') {
+          setMessage('No paid checkout was found yet. If you just paid, wait a few seconds and try again.');
+        }
       } catch (reason) {
         if (reason instanceof ApiRequestError && reason.status === 401) setUser(null);
       }
@@ -80,7 +90,7 @@ export default function AccountPage() {
     let attempts = 0;
     const paymentPoller = awaitingPayment ? window.setInterval(() => {
       attempts += 1;
-      void load();
+      void load(true);
       if (attempts >= 10) window.clearInterval(paymentPoller);
     }, 3000) : undefined;
     const refreshOnFocus = () => void load();
@@ -226,7 +236,7 @@ export default function AccountPage() {
           </div>
         </section>
 
-        {message ? <div role="status" className={`mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl p-4 text-sm ${message.startsWith('Payment received')?'bg-green-100 text-green-800':message.startsWith('Checkout cancelled')?'bg-amber-100 text-amber-800':'bg-red-100 text-red-800'}`}><span>{message}</span>{message.startsWith('Payment received')?<button onClick={() => void load()} className="font-bold underline">Check payment status</button>:null}</div> : null}
+        {message ? <div role="status" className={`mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl p-4 text-sm ${message.startsWith('Payment received')||message.startsWith('Payment confirmed')?'bg-green-100 text-green-800':message.startsWith('Checkout cancelled')?'bg-amber-100 text-amber-800':'bg-red-100 text-red-800'}`}><span>{message}</span>{message.startsWith('Payment received')?<button onClick={() => void load(true)} className="font-bold underline">Check payment status</button>:null}</div> : null}
         <section className="mb-6 grid gap-5 md:grid-cols-2">
           <div className="rounded-[2rem] border border-black/10 bg-white/60 p-7">
             <div className="flex items-start justify-between gap-4">

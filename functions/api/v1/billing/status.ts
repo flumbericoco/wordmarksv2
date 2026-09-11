@@ -1,4 +1,5 @@
 import { getUserSession } from '../user-auth';
+import { fulfillPaidCheckout, StripeCheckoutSession } from './fulfill';
 
 interface Env { DB: D1Database; STRIPE_SECRET_KEY?: string }
 
@@ -13,6 +14,23 @@ async function stripeGet(path: string, secret: string): Promise<Record<string, u
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const user = await getUserSession(request, env.DB);
   if (!user) return Response.json({ error: 'Authentication required' }, { status: 401 });
+
+  const url = new URL(request.url);
+  const requestedSessionId = url.searchParams.get('session_id');
+  let reconciliation: Record<string, unknown> | null = null;
+  if (env.STRIPE_SECRET_KEY) {
+    let checkout: StripeCheckoutSession | null = null;
+    if (requestedSessionId?.startsWith('cs_')) {
+      checkout = await stripeGet(`checkout/sessions/${encodeURIComponent(requestedSessionId)}`, env.STRIPE_SECRET_KEY) as StripeCheckoutSession | null;
+    } else if (url.searchParams.get('reconcile') === '1') {
+      // Recovery for checkouts created before the success URL included a session ID.
+      const recent = await stripeGet('checkout/sessions?limit=25', env.STRIPE_SECRET_KEY);
+      const sessions = Array.isArray(recent?.data) ? recent.data as StripeCheckoutSession[] : [];
+      checkout = sessions.find((item) => item.metadata?.user_id === user.id && item.payment_status === 'paid') || null;
+    }
+    if (checkout) reconciliation = await fulfillPaidCheckout(env.DB, checkout, user.id);
+    else if (requestedSessionId || url.searchParams.get('reconcile') === '1') reconciliation = { fulfilled: false, paymentStatus: 'not_found' };
+  }
 
   const local = await env.DB.prepare(
     'SELECT stripe_subscription_id, plan, status, current_period_end, updated_at FROM subscriptions WHERE user_id = ? ORDER BY updated_at DESC LIMIT 1'
@@ -59,5 +77,5 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     'SELECT id, amount, reason, created_at FROM credit_ledger WHERE user_id = ? ORDER BY created_at DESC LIMIT 20'
   ).bind(user.id).all();
 
-  return Response.json({ ok: true, subscription, invoices, creditHistory: ledger.results || [] });
+  return Response.json({ ok: true, subscription, invoices, creditHistory: ledger.results || [], reconciliation });
 };

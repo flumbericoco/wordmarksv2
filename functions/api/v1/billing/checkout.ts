@@ -48,7 +48,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const origin = new URL(request.url).origin;
   const form = new URLSearchParams({
     mode: 'subscription',
-    success_url: `${origin}/account?checkout=success`,
+    success_url: `${origin}/account?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/account?checkout=cancelled`,
     'line_items[0][price]': initialPriceId,
     'line_items[0][quantity]': '1',
