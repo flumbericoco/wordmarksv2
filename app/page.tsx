@@ -148,7 +148,9 @@ export default function Home() {
       const result = await generateLogo(data, researchText);
       setLogo(result);
       rememberResult(data, researchText, result, 0);
-      if (autoReview) {
+      if (result.qualityReview) {
+        applyQualityReview(result, result.qualityReview);
+      } else if (autoReview) {
         const review = await reviewLogo(result.imageUrl, data.brandName, data.description).catch(() => null);
         if (review) applyQualityReview(result, review);
       }
@@ -172,7 +174,9 @@ export default function Home() {
       const nextIteration = iteration + 1;
       setIteration(nextIteration);
       rememberResult(wizardData, research, result, nextIteration);
-      if (autoReview) {
+      if (result.qualityReview) {
+        applyQualityReview(result, result.qualityReview);
+      } else if (autoReview) {
         const review = await reviewLogo(result.imageUrl, wizardData.brandName, wizardData.description).catch(() => null);
         if (review) applyQualityReview(result, review);
       }
@@ -211,7 +215,9 @@ export default function Home() {
       const nextIteration = iteration + 1;
       setIteration(nextIteration);
       rememberResult(wizardData, research, result, nextIteration);
-      if (autoReview) {
+      if (result.qualityReview) {
+        applyQualityReview(result, result.qualityReview);
+      } else if (autoReview) {
         const review = await reviewLogo(result.imageUrl, wizardData.brandName, wizardData.description).catch(() => null);
         if (review) applyQualityReview(result, review);
       }

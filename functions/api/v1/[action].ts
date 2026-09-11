@@ -221,8 +221,33 @@ async function handleGenerate(
     const useSvgGeneration = providerHost === 'api.pesatrouter.com' || !provider.imageModel;
     const settingsRows = await db.prepare("SELECT key,value FROM settings WHERE key IN ('imageQuality','imageSize')").all<{ key: string; value: string }>();
     const generationSettings = Object.fromEntries(settingsRows.results.map((row) => [row.key, row.value]));
+    let selectedReview: import('../../lib/types').QualityScore | undefined;
     const result = useSvgGeneration
-      ? await generateSvgWordmark(prompt, body.brandName, provider)
+      ? await (async () => {
+          const directions = [
+            'Build a unified symbol with meaningful negative space. Avoid play buttons, sparkles, generic orbit shapes, and stock tech motifs.',
+            'Explore an ownable abstract metaphor derived from the brand purpose. Favor one bold silhouette and exceptional optical balance.',
+            'Explore a distinctive letterform or ligature concept while keeping the full name immediately readable and professionally kerned.',
+          ];
+          const candidates = await Promise.all(directions.map((direction, index) =>
+            generateSvgWordmark(`${prompt}\nCANDIDATE ${index + 1} ART DIRECTION: ${direction}`, body.brandName, provider)
+          ));
+          const scored = await Promise.all(candidates.map(async (candidate) => {
+            try {
+              const review = await handleReview({
+                imageUrl: candidate.url,
+                brandName: body.brandName,
+                description: body.description,
+              } as ReviewRequest, provider) as import('../../lib/types').QualityScore;
+              return { candidate, review };
+            } catch {
+              return { candidate, review: undefined };
+            }
+          }));
+          const best = scored.sort((a, b) => (b.review?.overall || 0) - (a.review?.overall || 0))[0];
+          selectedReview = best.review;
+          return best.candidate;
+        })()
       : await generateImageServer(
           prompt,
           provider.apiKey,
@@ -266,13 +291,14 @@ async function handleGenerate(
 
     // Log job completion (include r2_key if archived)
     await db.prepare(
-        `UPDATE generation_jobs SET status = 'completed', result_url = ?, duration_ms = ?, completed_at = datetime('now')
+        `UPDATE generation_jobs SET status = 'completed', result_url = ?, quality_score = ?, duration_ms = ?, completed_at = datetime('now')
          WHERE id = ?`
-      ).bind(result.url, duration, jobId).run();
+      ).bind(result.url, selectedReview?.overall ?? null, duration, jobId).run();
 
     return {
       imageUrl: result.url,
       generationId: jobId,
+      ...(selectedReview ? { qualityReview: selectedReview } : {}),
       ...(r2Key ? { r2Key } : {}),
     };
   } catch (err) {
