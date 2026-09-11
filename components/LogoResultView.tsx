@@ -13,6 +13,7 @@ interface LogoResultViewProps {
   onRegenerate: () => void;
   onReview: () => void;
   onIterate: () => void;
+  canIterate: boolean;
   onDownload: (format: 'svg' | 'png') => void;
   onNewLogo: () => void;
 }
@@ -40,6 +41,7 @@ export default function LogoResultView({
   onRegenerate,
   onReview,
   onIterate,
+  canIterate,
   onDownload,
   onNewLogo,
 }: LogoResultViewProps) {
@@ -143,9 +145,10 @@ export default function LogoResultView({
             {!qualityReview.approved && (
               <button
                 onClick={onIterate}
-                className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-500 transition-colors"
+                disabled={!canIterate}
+                className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-500 transition-colors disabled:cursor-not-allowed disabled:opacity-45"
               >
-                ↻ Iterate & Improve · 1 credit
+                {canIterate ? '↻ Iterate & Improve · 1 credit' : 'Revision limit reached'}
               </button>
             )}
           </div>

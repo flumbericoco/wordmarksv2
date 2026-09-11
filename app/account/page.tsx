@@ -217,7 +217,7 @@ export default function AccountPage() {
             <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
               {[['lite', '$1', '1'], ['growth', '$3', '4'], ['pro', '$7', '10'], ['scale', '$17', '28']].map(([plan, price, credits]) => (
                 <button key={plan} disabled={busy || Boolean(billing.subscription)} onClick={() => checkout(plan)} className={`rounded-2xl border bg-white p-4 text-left transition-transform hover:-translate-y-1 disabled:cursor-not-allowed disabled:opacity-50 ${requestedPlan===plan?'border-[#5b42d5] ring-4 ring-[#5b42d5]/10':'border-black/10'}`}>
-                  <span className="text-xs font-black uppercase">{plan}</span><strong className="mt-4 block text-2xl">{price}<small className="text-xs font-normal text-black/40">/mo</small></strong><span className="mt-1 block text-xs text-black/45">{credits} credits/month</span>
+                  <span className="text-xs font-black uppercase">{plan}</span><strong className="mt-4 block text-2xl">{price}<small className="text-xs font-normal text-black/40">/mo</small></strong><span className="mt-1 block text-xs text-black/45">{credits} {credits === '1' ? 'credit' : 'credits'}/month</span>
                 </button>
               ))}
             </div>

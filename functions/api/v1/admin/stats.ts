@@ -57,8 +57,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     return successResponse({
       providers: {
-        total: providerCount?.count || 0,
-        active: activeProvider || null,
+        total: providerCount?.count || (env.OPENAI_API_KEY ? 1 : 0),
+        active: activeProvider || (env.OPENAI_API_KEY ? { name: 'PesatRouter (environment)', text_model: 'pesat-flash', image_model: '' } : null),
       },
       generation: {
         total: jobStats?.total || 0,

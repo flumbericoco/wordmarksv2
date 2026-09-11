@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { WizardData, LogoResult, QualityScore } from '@/lib/types';
 import { generateLogo, reviewLogo } from '@/lib/api';
 import WizardContainer from '@/components/wizard/WizardContainer';
@@ -41,6 +41,20 @@ export default function Home() {
   const [account, setAccount] = useState<{ email: string; credits: number } | null>(null);
   const [maxIterations, setMaxIterations] = useState(3);
   const [autoReview, setAutoReview] = useState(false);
+  const bestCandidate = useRef<{ logo: LogoResult; review: QualityScore } | null>(null);
+
+  const applyQualityReview = (candidate: LogoResult, review: QualityScore) => {
+    const best = bestCandidate.current;
+    if (!best || review.overall >= best.review.overall) {
+      bestCandidate.current = { logo: candidate, review };
+      setQualityReview(review);
+      return;
+    }
+    setLogo(best.logo);
+    setQualityReview(best.review);
+    setError(`The new revision scored ${review.overall}/10, below your best ${best.review.overall}/10. The best version was restored automatically.`);
+    if (wizardData) rememberResult(wizardData, research, best.logo, iteration);
+  };
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -124,6 +138,7 @@ export default function Home() {
   }, [view]);
 
   const handleWizardComplete = async (data: WizardData, researchText: string) => {
+    bestCandidate.current = null;
     setWizardData(data);
     setResearch(researchText);
     setView('result');
@@ -135,7 +150,7 @@ export default function Home() {
       rememberResult(data, researchText, result, 0);
       if (autoReview) {
         const review = await reviewLogo(result.imageUrl, data.brandName, data.description).catch(() => null);
-        if (review) setQualityReview(review);
+        if (review) applyQualityReview(result, review);
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Generation failed');
@@ -159,7 +174,7 @@ export default function Home() {
       rememberResult(wizardData, research, result, nextIteration);
       if (autoReview) {
         const review = await reviewLogo(result.imageUrl, wizardData.brandName, wizardData.description).catch(() => null);
-        if (review) setQualityReview(review);
+        if (review) applyQualityReview(result, review);
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Regeneration failed');
@@ -175,7 +190,7 @@ export default function Home() {
     setError(null);
     try {
       const review = await reviewLogo(logo.imageUrl, wizardData.brandName, wizardData.description);
-      setQualityReview(review);
+      applyQualityReview(logo, review);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Review failed');
     } finally {
@@ -198,7 +213,7 @@ export default function Home() {
       rememberResult(wizardData, research, result, nextIteration);
       if (autoReview) {
         const review = await reviewLogo(result.imageUrl, wizardData.brandName, wizardData.description).catch(() => null);
-        if (review) setQualityReview(review);
+        if (review) applyQualityReview(result, review);
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Iteration failed');
@@ -542,6 +557,7 @@ export default function Home() {
                   onRegenerate={handleRegenerate}
                   onReview={handleReview}
                   onIterate={handleIterate}
+                  canIterate={iteration < maxIterations}
                   onDownload={handleDownload}
                   onNewLogo={handleNewLogo}
                 />
