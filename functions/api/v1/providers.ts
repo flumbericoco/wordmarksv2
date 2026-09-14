@@ -207,7 +207,7 @@ export async function chatCompletionServer(
 export async function chatCompletionWithImageServer(
   systemPrompt: string,
   userPrompt: string,
-  imageUrl: string,
+  imageUrl: string | string[],
   apiKey: string,
   baseUrl: string,
   model: string,
@@ -224,7 +224,8 @@ export async function chatCompletionWithImageServer(
           { role: 'system', content: systemPrompt },
           { role: 'user', content: [
             { type: 'text', text: userPrompt },
-            { type: 'image_url', image_url: { url: imageUrl } },
+            ...(Array.isArray(imageUrl) ? imageUrl : [imageUrl]).slice(0, 3)
+              .map((url) => ({ type: 'image_url', image_url: { url } })),
           ] },
         ],
         temperature: 0.2,

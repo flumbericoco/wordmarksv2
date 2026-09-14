@@ -148,6 +148,8 @@ async function generateSvgWordmark(
   prompt: string,
   brandName: string,
   provider: { apiKey: string; baseUrl: string; textModel: string },
+  visualReferences: string[] = [],
+  studioInstructions = '',
 ): Promise<{ url: string }> {
   let lastError: Error | null = null;
   const maxAttempts = provider.textModel === 'pesat-pro' ? 1 : 3;
@@ -155,7 +157,13 @@ async function generateSvgWordmark(
     const correction = attempt > 0
       ? ' Previous output failed logo-quality validation. Return a simpler flat logo only: one compact symbol directly beside one contiguous brand-name wordmark. Remove all backgrounds, frames, grids, taglines, labels, metadata, slogans, glow, filters, patterns and decorative presentation elements. Never separate parts of the brand name with distant absolute x positions.'
       : '';
-    const content = await chatCompletionServer(
+    const render: typeof chatCompletionServer = (system, user, key, base, model, options) => {
+      const instructions = `${system}\n\nSTUDIO INSTRUCTIONS (override default aesthetic preferences, but not SVG safety requirements):\n${studioInstructions}\n\nThe attached references define the intended visual quality and composition. Inspect them before drawing; create original artwork rather than copying. Output must be standalone SVG, regardless of whether the studio calls it an image or artwork.`;
+      return visualReferences.length
+        ? chatCompletionWithImageServer(instructions, user, visualReferences, key, base, model)
+        : chatCompletionServer(instructions, user, key, base, model, options);
+    };
+    const content = await render(
       `You are a world-class identity designer and SVG artist. Create a compact production logo, never a poster, banner, mockup, or presentation board. Return one valid self-contained SVG only with viewBox="0 0 1200 500" and a transparent artboard. Use one distinctive flat vector symbol directly beside one readable wordmark spelling "${brandName}" exactly. Keep the symbol gap about one letter-width. Keep the entire brand name contiguous using one text element or adjacent tspans without independent x positions. Use at most two text elements total. No background, frame, grid, tagline, slogan, metadata, labels, tiny text, glow, shadow, filter, pattern, decorative scene, or excessive whitespace. Use simple geometric shapes, at most three flat colors, and system font fallbacks. Center the compact lockup with 8–12% clear space. Do not use markdown, style tags, scripts, event handlers, href, external URLs, external fonts, embedded content, or foreignObject.`,
       `${prompt}${correction}`,
       provider.apiKey,
@@ -221,7 +229,6 @@ async function handleGenerate(
       }
     }
     prompt += `\n\nSTRICTLY AVOID:\n${creatorSettings.negativePrompt || 'generic stock icons, clipart, template logos, mockups, posters, watermarks, taglines, extra text, misspellings, glow, bevels, 3D, and busy detail'}`;
-    prompt += '\n\nOUTPUT REQUIREMENT: Generate the actual finished high-resolution logo image with a transparent background. Do not answer with SVG/XML, code, prose, a prompt, or a design explanation.';
 
     const kbImages = creatorSettings.knowledgeBaseEnabled === 'false' ? [] : (await db.prepare(
       "SELECT image_data FROM knowledge_items WHERE image_data LIKE 'data:image/%' ORDER BY created_at DESC LIMIT 3"
@@ -239,6 +246,9 @@ async function handleGenerate(
     const useSvgGeneration = !effectiveImageModel
       || effectiveImageModel.toLowerCase() === 'svg'
       || (providerHost === 'api.pesatrouter.com' && /^pesat-/i.test(effectiveImageModel));
+    prompt += useSvgGeneration
+      ? '\n\nOUTPUT REQUIREMENT: Return only one safe standalone SVG logo. Do not return HTML, markdown, prose, or explanations.'
+      : '\n\nOUTPUT REQUIREMENT: Return the finished high-resolution logo image, not SVG/XML, code, prose, or explanations.';
     const generationSettings = creatorSettings;
     let selectedReview: import('../../lib/types').QualityScore | undefined;
     // pesat-pro is used for strategy and review. Long SVG responses from it
@@ -254,7 +264,7 @@ async function handleGenerate(
             'Explore a distinctive letterform or ligature concept while keeping the full name immediately readable and professionally kerned.',
           ];
           const candidates = await Promise.all(directions.map((direction, index) =>
-            generateSvgWordmark(`${prompt}\nCANDIDATE ${index + 1} ART DIRECTION: ${direction}`, body.brandName, svgProvider)
+            generateSvgWordmark(`${prompt}\nCANDIDATE ${index + 1} ART DIRECTION: ${direction}`, body.brandName, svgProvider, visualReferences, privateInstructions)
           ));
           const scored = await Promise.all(candidates.map(async (candidate) => {
             try {
