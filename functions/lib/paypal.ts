@@ -165,7 +165,7 @@ export async function createPayPalOrder(
   const base = getPayPalApiBase(config.mode);
 
   const customId = `${params.userId}:${params.productKey}:${product.kind}`;
-  const returnUrl = `${params.origin}/account?paypal=success&order_id={id}&product=${params.productKey}`;
+  const returnUrl = `${params.origin}/account?paypal=success&product=${params.productKey}`;
   const cancelUrl = `${params.origin}/account?paypal=cancelled`;
 
   const orderPayload = {
@@ -224,11 +224,14 @@ export async function createPayPalOrder(
     status?: string;
     links?: Array<{ href: string; rel: string; method: string }>;
     message?: string;
-    details?: Array<{ issue: string; description: string }>;
+    details?: Array<{ issue: string; description: string; field?: string }>;
   };
 
   if (!response.ok || !order.id) {
-    const detail = order.details?.[0]?.description || order.message || 'Failed to create PayPal order';
+    const firstDetail = order.details?.[0];
+    const detail = firstDetail
+      ? `${firstDetail.description || firstDetail.issue || 'Invalid request'}${firstDetail.field ? ` (${firstDetail.field})` : ''}`
+      : order.message || 'Failed to create PayPal order';
     throw new Error(`PayPal Order Creation failed: ${detail}`);
   }
 
