@@ -335,13 +335,12 @@ export default function AccountPage() {
                 <div className="flex items-start gap-3">
                   <div className="mt-0.5 rounded-full bg-amber-200 p-1.5 text-amber-900 text-sm leading-none">⚙️</div>
                   <div>
-                    <h3 className="text-sm font-bold">PayPal Payment Gateway Setup in Progress</h3>
-                    <p className="mt-0.5 text-xs text-amber-900/80">PayPal credentials have not been configured yet. If you are the store administrator, please enter your PayPal Client ID and Secret in Admin Studio.</p>
+                    <h3 className="text-sm font-bold">Payment Gateway Setup in Progress</h3>
+                    <p className="mt-0.5 text-xs text-amber-900/80">PayPal checkout is currently being initialized. Please check back shortly or reach out to support if you need immediate assistance.</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Link href="/admin/billing" className="rounded-full bg-amber-900 px-4 py-2 text-xs font-black text-white hover:bg-black transition">Open Admin Billing →</Link>
-                  <button onClick={() => setMessage('')} className="rounded-full px-2.5 py-1.5 text-xs font-bold text-amber-750 hover:text-black">✕</button>
+                  <button onClick={() => setMessage('')} className="rounded-full px-3 py-1.5 text-xs font-bold text-amber-800 hover:text-black">✕ Dismiss</button>
                 </div>
               </div>
             </div>
