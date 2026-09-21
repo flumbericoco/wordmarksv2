@@ -209,11 +209,7 @@ export default function AccountPage() {
   }
 
   async function checkout(plan: string) {
-    setBusy(true); setMessage('');
-    try {
-      const result = await api<{ url: string }>('billing/checkout', { method: 'POST', body: JSON.stringify({ plan }) });
-      window.location.assign(result.url);
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'Checkout unavailable'); setBusy(false); }
+    return paypalCheckout(plan);
   }
 
   async function paypalCheckout(product: string = 'topup') {
@@ -250,9 +246,7 @@ export default function AccountPage() {
   }
 
   async function topup() {
-    setBusy(true); setMessage('');
-    try { const result = await api<{url:string}>('billing/topup',{method:'POST'}); window.location.assign(result.url); }
-    catch(error){setMessage(error instanceof Error?error.message:'Top-up unavailable');setBusy(false);}
+    return paypalCheckout('topup');
   }
 
   async function deleteAccount() {
@@ -313,152 +307,358 @@ export default function AccountPage() {
     );
   }
 
+  const isPayPalUnconfigured = message.toLowerCase().includes('paypal is not configured');
+
   return (
-    <main className="min-h-screen bg-[#f2f0e9] px-5 py-8 text-[#171714] sm:px-8">
+    <main className="min-h-screen bg-[#f7f6f2] px-5 py-8 text-[#171714] sm:px-8">
       <div className="mx-auto max-w-6xl">
         <header className="flex flex-wrap items-center justify-between gap-4 border-b border-black/10 pb-6">
-          <Link href="/" className="text-2xl font-black tracking-[-0.06em]">wordmarks<span className="text-[#ff5c35]">.</span></Link>
-          <div className="flex items-center gap-4 text-right">
-            <div>
-              <p className="text-sm font-bold">{user.email}</p>
-              <p className="text-xs text-black/45">{user.plan === 'none' ? 'Standard account (0 credits)' : `${user.plan} plan`}</p>
+          <div className="flex items-center gap-6">
+            <Link href="/" className="text-2xl font-black tracking-[-0.06em]">wordmarks<span className="text-[#ff5c35]">.</span></Link>
+            <Link href="/" className="hidden text-xs font-semibold uppercase tracking-[0.14em] text-black/50 hover:text-black sm:inline-block">← Back to Studio</Link>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="rounded-full border border-black/10 bg-white px-4 py-1.5 text-right shadow-sm">
+              <span className="text-xs font-bold text-[#171714]">{user.email}</span>
+              <span className="mx-2 text-black/20">|</span>
+              <span className="text-xs font-medium text-black/50">{user.credits} credits</span>
             </div>
-            <button onClick={logout} className="rounded-full border border-black/15 px-4 py-2 text-xs font-bold">Sign out</button>
+            <button onClick={logout} className="rounded-full border border-black/15 bg-white px-4 py-2 text-xs font-bold transition hover:bg-black/5">Sign out</button>
           </div>
         </header>
 
-        <section className="grid gap-5 py-10 md:grid-cols-[0.65fr_1.35fr]">
-          <div className="rounded-[2rem] bg-[#171714] p-7 text-white">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#c6ff4a]">Available credits</p>
-            <p className="mt-5 text-7xl font-black tracking-[-0.08em]">{user.credits}</p>
-            <p className="mt-3 text-sm text-white/50">One credit generates one logo. Direct purchase only · No free trial. Unused credits never expire.</p>
-            <div className="mt-5 flex flex-wrap gap-2">
+        {/* Status and notification banner */}
+        {message ? (
+          isPayPalUnconfigured ? (
+            <div className="mt-6 rounded-2xl border border-amber-300 bg-amber-50/90 p-5 text-amber-950 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 rounded-full bg-amber-200 p-1.5 text-amber-900 text-sm leading-none">⚙️</div>
+                  <div>
+                    <h3 className="text-sm font-bold">PayPal Payment Gateway Setup in Progress</h3>
+                    <p className="mt-0.5 text-xs text-amber-900/80">PayPal credentials have not been configured yet. If you are the store administrator, please enter your PayPal Client ID and Secret in Admin Studio.</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Link href="/admin/billing" className="rounded-full bg-amber-900 px-4 py-2 text-xs font-black text-white hover:bg-black transition">Open Admin Billing →</Link>
+                  <button onClick={() => setMessage('')} className="rounded-full px-2.5 py-1.5 text-xs font-bold text-amber-750 hover:text-black">✕</button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div role="status" className={`mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl p-4 text-sm font-medium shadow-sm ${
+              message.startsWith('Payment received') || message.startsWith('Payment confirmed')
+                ? 'border border-emerald-300 bg-emerald-50 text-emerald-950'
+                : message.includes('cancelled')
+                ? 'border border-black/10 bg-white text-black/75'
+                : 'border border-red-200 bg-red-50 text-red-900'
+            }`}>
+              <div className="flex items-center gap-2.5">
+                <span>{message.startsWith('Payment received') || message.startsWith('Payment confirmed') ? '🎉' : message.includes('cancelled') ? 'ℹ️' : '⚠️'}</span>
+                <span>{message}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {message.startsWith('Payment received') ? (
+                  <button onClick={() => void load(true)} className="rounded-full bg-emerald-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-800">Check Balance</button>
+                ) : null}
+                <button onClick={() => setMessage('')} className="text-xs font-bold opacity-60 hover:opacity-100">✕ Dismiss</button>
+              </div>
+            </div>
+          )
+        ) : null}
+
+        {/* Hero Billing / Credits Section */}
+        <section className="grid gap-6 py-8 lg:grid-cols-[0.75fr_1.25fr]">
+          {/* Credit Balance Card */}
+          <div className="flex flex-col justify-between rounded-[2rem] bg-[#121210] p-8 text-white shadow-xl">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black uppercase tracking-[0.2em] text-[#c6ff4a]">Available Balance</span>
+                <span className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white/70">Direct Purchase</span>
+              </div>
+              <div className="mt-6 flex items-baseline gap-3">
+                <span className="text-7xl font-black tracking-[-0.07em] text-white sm:text-8xl">{user.credits}</span>
+                <span className="text-sm font-bold uppercase tracking-wider text-white/40">credits</span>
+              </div>
+              <p className="mt-4 text-xs leading-5 text-white/60">
+                1 credit generates 1 logo export (SVG + PNG + WebP). Direct purchase only · No free trial. Unused credits never expire.
+              </p>
+            </div>
+
+            <div className="mt-8 border-t border-white/10 pt-6">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/40">Instant Refill Pack</p>
               <button
                 disabled={busy}
                 onClick={() => paypalCheckout('topup')}
-                className="rounded-full bg-[#003087] hover:bg-[#002466] px-5 py-3 text-xs font-black uppercase tracking-wider text-white disabled:opacity-50 transition-transform hover:-translate-y-0.5 flex items-center gap-2"
+                className="mt-3 w-full rounded-2xl bg-[#c6ff4a] hover:bg-[#b5f532] px-6 py-4 text-left font-black text-black shadow-lg shadow-[#c6ff4a]/20 transition-all hover:-translate-y-0.5 disabled:opacity-50 flex items-center justify-between"
               >
-                <span>Pay with PayPal</span>
-                <span className="rounded-full bg-[#c6ff4a] px-2 py-0.5 text-[10px] font-black text-black">25 Credits · $25</span>
+                <div>
+                  <span className="block text-sm font-black uppercase tracking-wider">Top Up 25 Credits</span>
+                  <span className="block text-[11px] font-medium text-black/70">Card or PayPal · $1.00 per credit</span>
+                </div>
+                <span className="rounded-full bg-black px-3 py-1.5 text-xs font-black text-white">$25</span>
               </button>
-              <button
-                disabled={busy}
-                onClick={topup}
-                className="rounded-full border border-white/20 bg-white/10 hover:bg-white/20 px-4 py-3 text-xs font-bold uppercase text-white/90 disabled:opacity-50 transition-colors"
-              >
-                Card / Stripe
-              </button>
+              <p className="mt-3 text-center text-[10px] text-white/45">
+                🔒 Powered by PayPal · Accepts Debit/Credit Card or PayPal account
+              </p>
             </div>
           </div>
 
-          <div className="rounded-[2rem] border border-black/10 bg-white/60 p-7">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#5b42d5]">Choose your monthly plan</p>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-black/40">Direct purchase · Instant activation</span>
+          {/* Monthly Plans Section */}
+          <div className="flex flex-col justify-between rounded-[2rem] border border-black/10 bg-white p-7 sm:p-8 shadow-sm">
+            <div>
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/10 pb-4">
+                <div>
+                  <h2 className="text-xs font-black uppercase tracking-[0.18em] text-[#5b42d5]">Choose Your Monthly Plan</h2>
+                  <p className="mt-0.5 text-xs text-black/50">Credits deposit immediately · Cancel or switch anytime</p>
+                </div>
+                <span className="rounded-full bg-[#5b42d5]/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#5b42d5]">
+                  Instant Activation
+                </span>
+              </div>
+
+              {/* 4 Plan Cards */}
+              <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+                {[
+                  { key: 'lite', name: 'Lite', price: '$1', credits: '1', effective: '$1.00', featured: false },
+                  { key: 'growth', name: 'Growth', price: '$3', credits: '4', effective: '$0.75', featured: false },
+                  { key: 'pro', name: 'Pro', price: '$7', credits: '10', effective: '$0.70', featured: true },
+                  { key: 'scale', name: 'Scale', price: '$17', credits: '28', effective: '$0.60', featured: false },
+                ].map((plan) => {
+                  const isSelected = requestedPlan === plan.key;
+                  return (
+                    <div
+                      key={plan.key}
+                      className={`relative flex flex-col justify-between rounded-2xl p-4 transition-all ${
+                        plan.featured
+                          ? 'border-2 border-[#5b42d5] bg-[#5b42d5]/[0.03] shadow-md ring-2 ring-[#5b42d5]/10'
+                          : isSelected
+                          ? 'border-2 border-black bg-black/[0.02]'
+                          : 'border border-black/10 bg-white hover:border-black/25'
+                      }`}
+                    >
+                      {plan.featured ? (
+                        <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-[#5b42d5] px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-white">
+                          Best Value
+                        </span>
+                      ) : null}
+
+                      <div>
+                        <span className="text-[11px] font-black uppercase tracking-wider text-black/60">{plan.name}</span>
+                        <div className="mt-2 flex items-baseline gap-1">
+                          <span className="text-3xl font-black tracking-[-0.05em]">{plan.price}</span>
+                          <span className="text-xs text-black/45">/mo</span>
+                        </div>
+                        <p className="mt-2 text-xs font-bold text-black">{plan.credits} {plan.credits === '1' ? 'credit' : 'credits'}<span className="text-[10px] font-normal text-black/45">/mo</span></p>
+                        <span className="mt-0.5 block text-[10px] text-black/40">{plan.effective}/logo</span>
+                      </div>
+
+                      <div className="mt-5 pt-3 border-t border-black/5">
+                        <button
+                          disabled={busy || Boolean(billing.subscription)}
+                          onClick={() => paypalCheckout(plan.key)}
+                          className={`w-full rounded-xl py-2.5 text-center text-xs font-black uppercase tracking-wider transition-all disabled:opacity-40 ${
+                            plan.featured
+                              ? 'bg-[#121210] hover:bg-black text-[#c6ff4a] shadow-sm'
+                              : 'bg-black/5 hover:bg-black/10 text-[#171714] border border-black/10'
+                          }`}
+                        >
+                          Select {plan.name}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {[['lite', '$1', '1'], ['growth', '$3', '4'], ['pro', '$7', '10'], ['scale', '$17', '28']].map(([plan, price, credits]) => (
-                <div key={plan} className={`rounded-2xl border bg-white p-4 text-left flex flex-col justify-between ${requestedPlan===plan?'border-[#5b42d5] ring-4 ring-[#5b42d5]/10':'border-black/10'}`}>
-                  <div>
-                    <span className="text-xs font-black uppercase">{plan}</span>
-                    <strong className="mt-2 block text-2xl">{price}<small className="text-xs font-normal text-black/40">/mo</small></strong>
-                    <span className="mt-1 block text-xs text-black/45">{credits} {credits === '1' ? 'credit' : 'credits'}/month</span>
+
+            {/* Trust Footer */}
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-black/10 pt-4 text-xs text-black/55">
+              <div className="flex flex-wrap items-center gap-4 text-[11px]">
+                <span className="flex items-center gap-1.5 font-semibold text-black/70">
+                  <span>🔒</span> PayPal & Card Checkout
+                </span>
+                <span>•</span>
+                <span>Unused credits roll over</span>
+                <span>•</span>
+                <span>Cancel anytime</span>
+              </div>
+              {billing.subscription ? (
+                <span className="font-bold text-[#5b42d5]">Active membership in place</span>
+              ) : null}
+            </div>
+          </div>
+        </section>
+
+        {/* Subscription details & Credit Activity */}
+        <section className="mb-6 grid gap-6 md:grid-cols-2">
+          <div className="rounded-[2rem] border border-black/10 bg-white p-7 shadow-sm">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[#5b42d5]">Membership Status</p>
+                <h2 className="mt-2 text-3xl font-black capitalize">{billing.subscription?.plan || 'No Active Plan'}</h2>
+              </div>
+              {billing.subscription ? (
+                <span className="rounded-full bg-[#c6ff4a] px-3 py-1 text-[10px] font-black uppercase text-black">{billing.subscription.status}</span>
+              ) : null}
+            </div>
+            {billing.subscription?.currentPeriodEnd ? (
+              <p className="mt-4 text-sm text-black/55">{billing.subscription.cancelAtPeriodEnd ? 'Access until' : 'Next billing date'}: {new Date(billing.subscription.currentPeriodEnd).toLocaleDateString()}</p>
+            ) : (
+              <p className="mt-4 text-sm text-black/45">{billing.subscription ? 'Billing active.' : 'Select a plan above to receive recurring monthly credits.'}</p>
+            )}
+            {billing.subscription?.cancelAtPeriodEnd ? (
+              <p className="mt-2 text-sm font-bold text-orange-700">Cancellation is scheduled, but access remains active until the date above.</p>
+            ) : null}
+            {billing.subscription ? (
+              <div className="mt-5 flex flex-wrap gap-3">
+                <button disabled={busy} onClick={openBillingPortal} className="rounded-full bg-[#171714] px-5 py-3 text-xs font-black uppercase tracking-wider text-white disabled:opacity-50">Manage billing</button>
+                {billing.subscription.cancelAtPeriodEnd ? (
+                  <button disabled={busy} onClick={cancelSubscriptionNow} className="rounded-full border border-red-600 px-5 py-3 text-xs font-black uppercase tracking-wider text-red-700 disabled:opacity-50">End subscription now</button>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="rounded-[2rem] border border-black/10 bg-white p-7 shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#5b42d5]">Recent Credit Activity</p>
+            <div className="mt-4 divide-y divide-black/10">
+              {billing.creditHistory.length === 0 ? (
+                <p className="py-4 text-sm text-black/45">No credit transactions yet.</p>
+              ) : (
+                billing.creditHistory.slice(0, 5).map((entry) => (
+                  <div key={entry.id} className="flex justify-between gap-4 py-3 text-sm">
+                    <span className="capitalize text-black/60">{entry.reason.replaceAll('_', ' ')}</span>
+                    <span className={entry.amount > 0 ? 'font-bold text-green-700' : 'font-bold text-red-700'}>
+                      {entry.amount > 0 ? '+' : ''}{entry.amount}
+                    </span>
                   </div>
-                  <div className="mt-4 flex flex-col gap-1.5 pt-2 border-t border-black/5">
-                    <button
-                      disabled={busy || Boolean(billing.subscription)}
-                      onClick={() => paypalCheckout(plan)}
-                      className="w-full rounded-lg bg-[#003087] hover:bg-[#002466] py-1.5 text-center text-[10px] font-black text-white disabled:opacity-40"
-                    >
-                      PayPal
-                    </button>
-                    <button
-                      disabled={busy || Boolean(billing.subscription)}
-                      onClick={() => checkout(plan)}
-                      className="w-full rounded-lg border border-black/15 bg-black/5 hover:bg-black/10 py-1.5 text-center text-[10px] font-bold text-black disabled:opacity-40"
-                    >
-                      Card
-                    </button>
+                ))
+              )}
+            </div>
+          </div>
+        </section>
+
+        {billing.invoices.length > 0 ? (
+          <section className="mb-6 rounded-[2rem] border border-black/10 bg-white p-7 shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#5b42d5]">Payment History</p>
+            <div className="mt-4 divide-y divide-black/10">
+              {billing.invoices.map((invoice) => (
+                <div key={invoice.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
+                  <div>
+                    <p className="font-bold">{invoice.number || 'Payment Invoice'}</p>
+                    <p className="text-xs text-black/45">{new Date(invoice.createdAt).toLocaleDateString()} · {invoice.status}</p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <strong>{invoice.currency} {(invoice.amountPaid / 100).toFixed(2)}</strong>
+                    {invoice.hostedUrl ? <a href={invoice.hostedUrl} target="_blank" rel="noreferrer" className="text-xs font-bold underline">View receipt</a> : null}
                   </div>
                 </div>
               ))}
             </div>
-            <p className="mt-4 text-xs leading-5 text-black/55">Plans are charged immediately upon checkout and add credits straight to your account. Unused credits roll over. Cancel anytime.</p>
-            {billing.subscription ? <p className="mt-2 text-xs font-bold text-[#5b42d5]">You already have an active plan. Use Manage billing below to adjust.</p> : null}
-          </div>
-        </section>
-
-        {message ? (
-          <div role="status" className={`mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl p-4 text-sm font-medium ${message.startsWith('Payment received')||message.startsWith('Payment confirmed')?'bg-green-100 text-green-800':message.startsWith('Checkout cancelled')||message.startsWith('PayPal checkout cancelled')?'bg-amber-100 text-amber-800':'bg-red-100 text-red-800'}`}>
-            <span>{message}</span>
-            {message.startsWith('Payment received') ? (
-              <button onClick={() => void load(true)} className="font-bold underline">Check payment status</button>
-            ) : null}
-          </div>
+          </section>
         ) : null}
 
-        <section className="mb-6 grid gap-5 md:grid-cols-2">
-          <div className="rounded-[2rem] border border-black/10 bg-white/60 p-7">
-            <div className="flex items-start justify-between gap-4">
-              <div><p className="text-xs font-black uppercase tracking-[0.18em] text-[#5b42d5]">Subscription</p><h2 className="mt-2 text-3xl font-black capitalize">{billing.subscription?.plan || 'No active plan'}</h2></div>
-              {billing.subscription ? <span className="rounded-full bg-[#c6ff4a] px-3 py-1 text-[10px] font-black uppercase">{billing.subscription.status}</span> : null}
-            </div>
-            {billing.subscription?.currentPeriodEnd ? <p className="mt-4 text-sm text-black/55">{billing.subscription.cancelAtPeriodEnd ? 'Access until' : 'Next billing date'}: {new Date(billing.subscription.currentPeriodEnd).toLocaleDateString()}</p> : <p className="mt-4 text-sm text-black/45">{billing.subscription ? 'Billing active.' : 'Choose a plan above to activate monthly credits.'}</p>}
-            {billing.subscription?.cancelAtPeriodEnd ? <p className="mt-2 text-sm font-bold text-orange-700">Cancellation is scheduled, but access remains active until the date above.</p> : null}
-            {billing.subscription ? <div className="mt-5 flex flex-wrap gap-3"><button disabled={busy} onClick={openBillingPortal} className="rounded-full bg-[#171714] px-5 py-3 text-xs font-black uppercase tracking-wider text-white disabled:opacity-50">Manage billing</button>{billing.subscription.cancelAtPeriodEnd ? <button disabled={busy} onClick={cancelSubscriptionNow} className="rounded-full border border-red-600 px-5 py-3 text-xs font-black uppercase tracking-wider text-red-700 disabled:opacity-50">End subscription now</button> : null}</div> : null}
-          </div>
-          <div className="rounded-[2rem] border border-black/10 bg-white/60 p-7">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#5b42d5]">Recent credit activity</p>
-            <div className="mt-4 divide-y divide-black/10">
-              {billing.creditHistory.length === 0 ? <p className="py-4 text-sm text-black/45">No credit activity yet.</p> : billing.creditHistory.slice(0, 5).map((entry) => <div key={entry.id} className="flex justify-between gap-4 py-3 text-sm"><span className="capitalize text-black/60">{entry.reason.replaceAll('_', ' ')}</span><span className={entry.amount > 0 ? 'font-bold text-green-700' : 'font-bold text-red-700'}>{entry.amount > 0 ? '+' : ''}{entry.amount}</span></div>)}
-            </div>
-          </div>
-        </section>
-
-        {billing.invoices.length > 0 ? <section className="mb-6 rounded-[2rem] border border-black/10 bg-white/60 p-7">
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-[#5b42d5]">Payment history</p>
-          <div className="mt-4 divide-y divide-black/10">{billing.invoices.map((invoice) => <div key={invoice.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm"><div><p className="font-bold">{invoice.number || 'Payment invoice'}</p><p className="text-xs text-black/45">{new Date(invoice.createdAt).toLocaleDateString()} · {invoice.status}</p></div><div className="flex items-center gap-4"><strong>{invoice.currency} {(invoice.amountPaid / 100).toFixed(2)}</strong>{invoice.hostedUrl ? <a href={invoice.hostedUrl} target="_blank" rel="noreferrer" className="text-xs font-bold underline">View receipt</a> : null}</div></div>)}</div>
-        </section> : null}
-
-        <section className="mb-6 rounded-[2rem] border border-black/10 bg-white/60 p-7">
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-[#5b42d5]">Logo history</p>
+        {/* Logo History */}
+        <section className="mb-6 rounded-[2rem] border border-black/10 bg-white p-7 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-[#5b42d5]">Saved Logos</p>
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {generations.length === 0 ? <p className="text-sm text-black/45">No saved logos yet.</p> : generations.map((item) => {
-              const extension = item.result_url?.startsWith('data:image/svg+xml') ? 'svg'
-                : item.result_url?.startsWith('data:image/webp') ? 'webp'
-                : item.result_url?.startsWith('data:image/jpeg') ? 'jpg' : 'png';
-              return <article key={item.id} className="rounded-2xl border border-black/10 bg-white p-4">
-                {item.result_url ? <img src={item.result_url} alt={`${item.brand_name} logo`} className="aspect-square w-full rounded-xl bg-neutral-100 object-contain"/> : <div className="grid aspect-square place-items-center rounded-xl bg-neutral-100 text-sm text-black/45">{item.status}</div>}
-                <div className="mt-3 flex items-center justify-between gap-3"><div><strong>{item.brand_name}</strong><p className="text-xs text-black/40">{new Date(`${item.created_at}Z`).toLocaleString()}</p></div>{item.result_url ? <a href={item.result_url} download={`${item.brand_name}-logo.${extension}`} className="text-xs font-bold underline">Download {extension.toUpperCase()}</a> : null}</div>
-                {item.status === 'completed' ? <div className="mt-3 flex items-center gap-1 border-t border-black/10 pt-3"><span className="mr-2 text-[11px] text-black/40">Rate</span>{[1,2,3,4,5].map((rating) => <button key={rating} onClick={() => void rateGeneration(item.id,rating)} aria-label={`Rate ${rating} out of 5`} className="text-lg text-amber-500">★</button>)}</div> : null}
-              </article>;
-            })}
+            {generations.length === 0 ? (
+              <p className="text-sm text-black/45">No saved logos yet.</p>
+            ) : (
+              generations.map((item) => {
+                const extension = item.result_url?.startsWith('data:image/svg+xml') ? 'svg'
+                  : item.result_url?.startsWith('data:image/webp') ? 'webp'
+                  : item.result_url?.startsWith('data:image/jpeg') ? 'jpg' : 'png';
+                return (
+                  <article key={item.id} className="rounded-2xl border border-black/10 bg-[#faf9f6] p-4">
+                    {item.result_url ? (
+                      <img src={item.result_url} alt={`${item.brand_name} logo`} className="aspect-square w-full rounded-xl bg-white object-contain p-2 shadow-inner"/>
+                    ) : (
+                      <div className="grid aspect-square place-items-center rounded-xl bg-neutral-100 text-sm text-black/45">{item.status}</div>
+                    )}
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <div>
+                        <strong>{item.brand_name}</strong>
+                        <p className="text-xs text-black/40">{new Date(`${item.created_at}Z`).toLocaleString()}</p>
+                      </div>
+                      {item.result_url ? (
+                        <a href={item.result_url} download={`${item.brand_name}-logo.${extension}`} className="text-xs font-bold underline">Download {extension.toUpperCase()}</a>
+                      ) : null}
+                    </div>
+                    {item.status === 'completed' ? (
+                      <div className="mt-3 flex items-center gap-1 border-t border-black/10 pt-3">
+                        <span className="mr-2 text-[11px] text-black/40">Rate</span>
+                        {[1, 2, 3, 4, 5].map((rating) => (
+                          <button key={rating} onClick={() => void rateGeneration(item.id, rating)} aria-label={`Rate ${rating} out of 5`} className="text-lg text-amber-500">★</button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </article>
+                );
+              })
+            )}
           </div>
         </section>
 
         {newToken ? (
-          <section className="mb-6 rounded-[1.5rem] border border-[#5b42d5]/25 bg-[#d9d3ff] p-6">
-            <p className="font-black">Copy this key now. It will not be shown again.</p>
+          <section className="mb-6 rounded-[1.5rem] border border-[#5b42d5]/25 bg-[#d9d3ff] p-6 shadow-sm">
+            <p className="font-black">Copy this API key now. It will not be shown again.</p>
             <code className="mt-3 block overflow-x-auto rounded-xl bg-[#171714] p-4 text-sm text-[#c6ff4a]">{newToken}</code>
             <button onClick={() => navigator.clipboard.writeText(newToken)} className="mt-3 rounded-full bg-[#171714] px-4 py-2 text-xs font-bold text-white">Copy key</button>
           </section>
         ) : null}
 
-        <section className="rounded-[2rem] border border-black/10 bg-white/60 p-7">
-          <div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[0.18em] text-[#5b42d5]">Developer API keys</p><h2 className="mt-2 text-3xl font-black tracking-[-0.05em]">Connect your AI agents</h2></div><div className="flex items-center gap-3"><label className="text-xs text-black/50"><input type="checkbox" checked={showRevokedKeys} onChange={(event) => setShowRevokedKeys(event.target.checked)} className="mr-2"/>Show revoked</label><button disabled={busy} onClick={createKey} className="rounded-full bg-[#171714] px-5 py-3 text-xs font-black uppercase tracking-wider text-white disabled:opacity-50">Create API key</button></div></div>
-          <div className="mt-6 divide-y divide-black/10 border-y border-black/10">
-            {keys.filter((key) => showRevokedKeys || !key.revoked_at).length === 0 ? <p className="py-6 text-sm text-black/45">No active API keys.</p> : keys.filter((key) => showRevokedKeys || !key.revoked_at).map((key) => (
-              <div key={key.id} className="flex items-center justify-between gap-4 py-4"><div><p className="font-bold">{key.name}</p><code className="text-xs text-black/45">{key.key_prefix}</code><p className="mt-1 text-[11px] text-black/40">{key.last_used_at ? `Last used ${new Date(`${key.last_used_at}Z`).toLocaleString()}` : 'Never used'}</p></div>{key.revoked_at ? <span className="text-xs text-red-600">Revoked</span> : <button onClick={() => revokeKey(key.id)} className="text-xs font-bold text-red-700">Revoke</button>}</div>
-            ))}
+        {/* Developer API Keys */}
+        <section className="rounded-[2rem] border border-black/10 bg-white p-7 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#5b42d5]">Developer API Keys</p>
+              <h2 className="mt-2 text-3xl font-black tracking-[-0.05em]">Connect your AI agents</h2>
+            </div>
+            <div className="flex items-center gap-3">
+              <label className="text-xs text-black/50">
+                <input type="checkbox" checked={showRevokedKeys} onChange={(event) => setShowRevokedKeys(event.target.checked)} className="mr-2"/>
+                Show revoked
+              </label>
+              <button disabled={busy} onClick={createKey} className="rounded-full bg-[#171714] px-5 py-3 text-xs font-black uppercase tracking-wider text-white disabled:opacity-50">Create API key</button>
+            </div>
           </div>
-          <div className="mt-6 rounded-2xl bg-[#171714] p-5 text-xs leading-6 text-white/65"><code>Authorization: Bearer wm_live_your_key</code><br /><code>https://wordmarks.net/mcp</code></div>
+          <div className="mt-6 divide-y divide-black/10 border-y border-black/10">
+            {keys.filter((key) => showRevokedKeys || !key.revoked_at).length === 0 ? (
+              <p className="py-6 text-sm text-black/45">No active API keys.</p>
+            ) : (
+              keys.filter((key) => showRevokedKeys || !key.revoked_at).map((key) => (
+                <div key={key.id} className="flex items-center justify-between gap-4 py-4">
+                  <div>
+                    <p className="font-bold">{key.name}</p>
+                    <code className="text-xs text-black/45">{key.key_prefix}</code>
+                    <p className="mt-1 text-[11px] text-black/40">{key.last_used_at ? `Last used ${new Date(`${key.last_used_at}Z`).toLocaleString()}` : 'Never used'}</p>
+                  </div>
+                  {key.revoked_at ? (
+                    <span className="text-xs text-red-600">Revoked</span>
+                  ) : (
+                    <button onClick={() => revokeKey(key.id)} className="text-xs font-bold text-red-700">Revoke</button>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+          <div className="mt-6 rounded-2xl bg-[#171714] p-5 text-xs leading-6 text-white/65">
+            <code>Authorization: Bearer wm_live_your_key</code><br />
+            <code>https://wordmarks.net/mcp</code>
+          </div>
         </section>
 
-        <section className="mt-6 rounded-[2rem] border border-red-200 bg-red-50 p-7">
+        {/* Danger Zone */}
+        <section className="mt-6 rounded-[2rem] border border-red-200 bg-red-50/60 p-7">
           <p className="text-xs font-black uppercase tracking-[0.18em] text-red-700">Danger zone</p>
           <h2 className="mt-2 text-2xl font-black">Delete account</h2>
           <p className="mt-2 text-sm text-red-900/60">This permanently removes your profile, credits, API keys, and logo history. Active subscriptions must be cancelled first. Payment providers may retain invoice and transaction records where legally required.</p>
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row"><input type="password" value={deletePassword} onChange={(event) => setDeletePassword(event.target.value)} placeholder="Confirm your password" className="rounded-xl border border-red-200 bg-white px-4 py-3 text-sm"/><button disabled={busy || !deletePassword} onClick={deleteAccount} className="rounded-full bg-red-700 px-5 py-3 text-xs font-black uppercase text-white disabled:opacity-50">Delete permanently</button></div>
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+            <input type="password" value={deletePassword} onChange={(event) => setDeletePassword(event.target.value)} placeholder="Confirm your password" className="rounded-xl border border-red-200 bg-white px-4 py-3 text-sm"/>
+            <button disabled={busy || !deletePassword} onClick={deleteAccount} className="rounded-full bg-red-700 px-5 py-3 text-xs font-black uppercase text-white disabled:opacity-50">Delete permanently</button>
+          </div>
         </section>
       </div>
     </main>
