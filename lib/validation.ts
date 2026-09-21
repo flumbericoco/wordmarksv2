@@ -295,6 +295,26 @@ export function validateSettingsRequest(body: unknown): ValidationResult<Setting
     result.knowledgeBaseEnabled = b.knowledgeBaseEnabled;
   }
 
+  if (b.paypalClientId !== undefined) {
+    if (!isString(b.paypalClientId)) return { valid: false, error: 'paypalClientId must be a string' };
+    result.paypalClientId = b.paypalClientId.trim();
+  }
+  if (b.paypalClientSecret !== undefined) {
+    if (!isString(b.paypalClientSecret)) return { valid: false, error: 'paypalClientSecret must be a string' };
+    result.paypalClientSecret = b.paypalClientSecret.trim();
+  }
+  if (b.paypalMode !== undefined) {
+    const rawMode = String(b.paypalMode).toLowerCase().trim();
+    if (rawMode !== 'sandbox' && rawMode !== 'live') {
+      return { valid: false, error: 'paypalMode must be "sandbox" or "live"' };
+    }
+    result.paypalMode = rawMode as 'sandbox' | 'live';
+  }
+  if (b.paypalWebhookId !== undefined) {
+    if (!isString(b.paypalWebhookId)) return { valid: false, error: 'paypalWebhookId must be a string' };
+    result.paypalWebhookId = b.paypalWebhookId.trim();
+  }
+
   return { valid: true, data: result };
 }
 
@@ -315,11 +335,17 @@ export function validateKnowledgeBaseRequest(body: unknown): ValidationResult<Kn
   if (!isString(filename) || filename.trim().length === 0) {
     return { valid: false, error: 'filename is required' };
   }
+  if (filename.length > 180 || (isString(category) && category.length > 80) || (isString(description) && description.length > 20_000)) {
+    return { valid: false, error: 'Knowledge base fields are too long' };
+  }
   if (category !== undefined && !isString(category)) {
     return { valid: false, error: 'category must be a string' };
   }
   if (tags !== undefined && !isArray(tags)) {
     return { valid: false, error: 'tags must be an array' };
+  }
+  if (isArray(tags) && (tags.length > 30 || tags.some((tag) => !isString(tag) || tag.length > 80))) {
+    return { valid: false, error: 'tags must contain up to 30 short strings' };
   }
   if (description !== undefined && !isString(description)) {
     return { valid: false, error: 'description must be a string' };

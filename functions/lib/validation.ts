@@ -320,6 +320,26 @@ export function validateSettingsRequest(body: unknown): ValidationResult<Setting
     result.knowledgeBaseEnabled = b.knowledgeBaseEnabled;
   }
 
+  if (b.paypalClientId !== undefined) {
+    if (!isString(b.paypalClientId)) return { valid: false, error: 'paypalClientId must be a string' };
+    result.paypalClientId = b.paypalClientId.trim();
+  }
+  if (b.paypalClientSecret !== undefined) {
+    if (!isString(b.paypalClientSecret)) return { valid: false, error: 'paypalClientSecret must be a string' };
+    result.paypalClientSecret = b.paypalClientSecret.trim();
+  }
+  if (b.paypalMode !== undefined) {
+    const rawMode = String(b.paypalMode).toLowerCase().trim();
+    if (rawMode !== 'sandbox' && rawMode !== 'live') {
+      return { valid: false, error: 'paypalMode must be "sandbox" or "live"' };
+    }
+    result.paypalMode = rawMode as 'sandbox' | 'live';
+  }
+  if (b.paypalWebhookId !== undefined) {
+    if (!isString(b.paypalWebhookId)) return { valid: false, error: 'paypalWebhookId must be a string' };
+    result.paypalWebhookId = b.paypalWebhookId.trim();
+  }
+
   return { valid: true, data: result };
 }
 
