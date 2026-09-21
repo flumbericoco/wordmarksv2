@@ -40,14 +40,14 @@ export default function DevelopersPage() {
             Give your AI agent a logo studio.
           </h1>
           <p className="mt-7 max-w-2xl text-lg leading-8 text-black/55">
-            Connect once, then generate editable SVG wordmarks from Codex, Kilo, Zcode, Claude Code, or any compatible MCP client.
+            Connect once, then generate high-resolution PNG logos from Codex, Kilo, Zcode, Claude Code, or any compatible MCP client. SVG can be created afterward from the website.
           </p>
 
           <div className="mt-12 grid gap-5 lg:grid-cols-3">
             {[
               ['01', 'Create your API key', 'Open your Wordmarks account, create a personal API key, and copy it once. Never use the PesatRouter key here.'],
               ['02', 'Connect MCP', 'Use Streamable HTTP directly, or mcp-remote when your agent only supports local stdio.'],
-              ['03', 'Describe the logo', 'Ask naturally. The agent calls generate_wordmark_logo and receives an editable SVG.'],
+              ['03', 'Describe the logo', 'Ask naturally. The agent calls generate_wordmark_logo and receives the generated image in its real PNG or SVG format.'],
             ].map(([number, title, copy]) => (
               <article key={number} className="rounded-[1.75rem] border border-black/10 bg-white/60 p-6">
                 <span className="font-mono text-xs text-[#ff5c35]">{number}</span>
@@ -104,7 +104,7 @@ export default function DevelopersPage() {
       <footer className="bg-[#171714] px-5 py-7 text-white sm:px-8">
         <div className="mx-auto flex max-w-7xl items-center justify-between text-xs text-white/40">
           <span>Wordmarks Developer Platform</span>
-          <span>SVG output · Token protected</span>
+          <span>PNG/SVG-aware output · Token protected</span>
         </div>
       </footer>
     </main>

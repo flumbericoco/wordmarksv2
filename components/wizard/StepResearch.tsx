@@ -175,13 +175,22 @@ export default function StepResearch({
                   </span>
                 )}
               </div>
-              <p className="text-xs text-zinc-500">{layout.reason}</p>
+              <p className="text-xs text-zinc-500">
+                {layout.id === 'wordmark'
+                  ? 'Text-only logo: the brand name becomes the identity, with no separate icon or symbol.'
+                  : layout.reason}
+              </p>
             </button>
           ))}
         </div>
       </div>
 
       {/* Actions */}
+      {selectedLayout && (
+        <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 px-4 py-3 text-xs text-blue-100">
+          Selected: <strong>{selectedLayout === 'wordmark' ? 'Wordmark — brand name only, no icon' : selectedLayout === 'stacked' ? 'Stacked — symbol above the brand name' : 'Symbol + Wordmark — icon beside the brand name'}</strong>
+        </div>
+      )}
       <div className="flex items-center justify-between pt-4">
         <button
           type="button"

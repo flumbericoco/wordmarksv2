@@ -1,5 +1,7 @@
 import { getUserSession, hashPassword, randomToken, sessionCookie, sha256 } from '../user-auth';
 import { recordAudit } from '../audit';
+import { getClientIp } from '../auth';
+import { checkRateLimit, rateLimitHeaders } from '../rate-limit';
 
 interface Env { DB: D1Database; RESEND_API_KEY?: string; EMAIL_FROM?: string; STRIPE_SECRET_KEY?: string }
 
@@ -137,6 +139,20 @@ export const onRequest: PagesFunction<Env> = async ({ request, env, params }) =>
     if (password.length > MAX_PASSWORD_LENGTH || email.length > 254) return json({ error: 'Invalid email or password' }, 401);
     const user = await env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(email).first<Record<string, unknown>>();
     if (!user || await hashPassword(password, String(user.password_salt)) !== String(user.password_hash)) {
+      const ip = getClientIp(request);
+      const identityHash = await sha256(`${ip}:${email}`);
+      const [identityLimit, ipLimit] = await Promise.all([
+        checkRateLimit(`login:${identityHash}`, 'invalid-credentials', env, 'login-identity'),
+        checkRateLimit(`login-ip:${ip}`, 'invalid-credentials', env, 'login-ip'),
+      ]);
+      const limit = !identityLimit.allowed ? identityLimit : ipLimit;
+      if (!limit.allowed) {
+        return json(
+          { error: `Too many failed sign-in attempts. Try again in ${limit.retryAfter || 60}s.` },
+          429,
+          rateLimitHeaders(limit),
+        );
+      }
       return json({ error: 'Invalid email or password' }, 401);
     }
     const pending = await env.DB.prepare('SELECT key FROM settings WHERE key=?').bind(pendingVerificationKey(String(user.id))).first();
@@ -196,11 +212,14 @@ export const onRequest: PagesFunction<Env> = async ({ request, env, params }) =>
   }
 
   if (action === 'generations' && request.method === 'GET') {
+    // Until R2 is enabled, result_url can be a ~1 MB data URL. Returning 50
+    // rows created a 50+ MB response that browsers and Pages could not load
+    // reliably, making successfully saved logos appear missing.
     const rows = await env.DB.prepare(
       `SELECT id,brand_name,status,model,result_url,error,duration_ms,created_at,completed_at
-       FROM generation_jobs WHERE user_id=? ORDER BY created_at DESC LIMIT 50`
+       FROM generation_jobs WHERE user_id=? ORDER BY created_at DESC LIMIT 9`
     ).bind(user.id).all();
-    return json({ ok: true, generations: rows.results || [] });
+    return json({ ok: true, generations: rows.results || [] }, 200, { 'Cache-Control': 'private, no-store' });
   }
 
   if (action === 'delete-account' && request.method === 'POST') {

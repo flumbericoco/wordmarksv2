@@ -137,9 +137,9 @@ export default function LogoResultView({
               </div>
               <div>
                 <p className="text-sm font-medium text-white">
-                  {qualityReview.overall >= 9 ? '✓ Premium Quality' : 'Needs Improvement'}
+                  {qualityReview.overall >= 9 ? 'Exceptional candidate' : qualityReview.overall >= 8 ? 'Premium candidate' : qualityReview.overall >= 7 ? 'Good draft' : 'Needs Improvement'}
                 </p>
-                <p className="text-xs text-zinc-500">Target: 9+ / 10</p>
+                <p className="text-xs text-zinc-500">Beta floor: 8+ · Target: 9+</p>
               </div>
             </div>
             {!qualityReview.approved && (
@@ -148,7 +148,11 @@ export default function LogoResultView({
                 disabled={!canIterate}
                 className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-500 transition-colors disabled:cursor-not-allowed disabled:opacity-45"
               >
-                {canIterate ? '↻ Iterate & Improve · 1 credit' : 'Revision limit reached'}
+                {canIterate
+                  ? qualityReview.overall < 8
+                    ? '↻ Replace Weak Concept · 1 credit'
+                    : '↻ Refine to 9–10 · 1 credit'
+                  : 'Revision limit reached'}
               </button>
             )}
           </div>

@@ -96,7 +96,7 @@ interface ProviderCallOptions {
   timeoutMs?: number;
   maxRetries?: number;
   quality?: 'standard' | 'hd';
-  size?: '1024x1024' | '1792x1024' | '1024x1792';
+  size?: '1024x1024' | '1792x1024' | '1024x1792' | '1536x1024' | '1024x1536';
   referenceImages?: string[];
 }
 
@@ -104,7 +104,7 @@ async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function providerEndpoint(baseUrl: string, endpoint: 'chat/completions' | 'images/generations'): string {
+function providerEndpoint(baseUrl: string, endpoint: 'chat/completions' | 'responses' | 'images/generations' | 'images/edits'): string {
   const url = new URL(baseUrl.trim());
   let path = url.pathname.replace(/\/+$/, '');
 
@@ -118,6 +118,18 @@ function providerEndpoint(baseUrl: string, endpoint: 'chat/completions' | 'image
 
   url.pathname = `${path}/${endpoint}`.replace(/\/{2,}/g, '/');
   return url.toString();
+}
+
+function responseText(data: Record<string, unknown>): string {
+  if (typeof data.output_text === 'string') return data.output_text;
+  const output = Array.isArray(data.output) ? data.output as Array<Record<string, unknown>> : [];
+  for (const item of output) {
+    const content = Array.isArray(item.content) ? item.content as Array<Record<string, unknown>> : [];
+    for (const part of content) {
+      if (typeof part.text === 'string') return part.text;
+    }
+  }
+  return '';
 }
 
 /**
@@ -151,13 +163,19 @@ export async function chatCompletionServer(
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      const res = await fetch(providerEndpoint(baseUrl, 'chat/completions'), {
+      const isOfficialOpenAI = new URL(baseUrl).hostname === 'api.openai.com';
+      const res = await fetch(providerEndpoint(baseUrl, isOfficialOpenAI ? 'responses' : 'chat/completions'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
         },
-        body: JSON.stringify({
+        body: JSON.stringify(isOfficialOpenAI ? {
+          model,
+          instructions: systemPrompt,
+          input: userPrompt,
+          reasoning: { effort: 'medium' },
+        } : {
           model,
           messages: [
             { role: 'system', content: systemPrompt },
@@ -184,6 +202,7 @@ export async function chatCompletionServer(
       }
 
       const data = await res.json() as Record<string, unknown>;
+      if (isOfficialOpenAI) return responseText(data);
       const choices = data.choices as Array<Record<string, unknown>> | undefined;
       const message = choices?.[0]?.message as Record<string, unknown> | undefined;
       return (typeof message?.content === 'string' ? message.content : '') as string;
@@ -211,20 +230,34 @@ export async function chatCompletionWithImageServer(
   apiKey: string,
   baseUrl: string,
   model: string,
+  options?: { timeoutMs?: number },
 ): Promise<string> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 60_000);
+  const timer = setTimeout(() => controller.abort(), options?.timeoutMs ?? 60_000);
   try {
-    const response = await fetch(providerEndpoint(baseUrl, 'chat/completions'), {
+    const isOfficialOpenAI = new URL(baseUrl).hostname === 'api.openai.com';
+    const response = await fetch(providerEndpoint(baseUrl, isOfficialOpenAI ? 'responses' : 'chat/completions'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
+      body: JSON.stringify(isOfficialOpenAI ? {
+        model,
+        instructions: systemPrompt,
+        input: [{
+          role: 'user',
+          content: [
+            { type: 'input_text', text: userPrompt },
+            ...(Array.isArray(imageUrl) ? imageUrl : [imageUrl]).slice(0, 10)
+              .map((url) => ({ type: 'input_image', image_url: url, detail: 'high' })),
+          ],
+        }],
+        reasoning: { effort: 'medium' },
+      } : {
         model,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: [
             { type: 'text', text: userPrompt },
-            ...(Array.isArray(imageUrl) ? imageUrl : [imageUrl]).slice(0, 3)
+            ...(Array.isArray(imageUrl) ? imageUrl : [imageUrl]).slice(0, 10)
               .map((url) => ({ type: 'image_url', image_url: { url } })),
           ] },
         ],
@@ -236,8 +269,10 @@ export async function chatCompletionWithImageServer(
       const body = await response.json().catch(() => ({})) as { error?: { message?: string } };
       throw new Error(body.error?.message || `Vision review failed (${response.status})`);
     }
-    const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
-    return data.choices?.[0]?.message?.content || '';
+    const data = await response.json() as Record<string, unknown>;
+    if (isOfficialOpenAI) return responseText(data);
+    const choices = data.choices as Array<{ message?: { content?: string } }> | undefined;
+    return choices?.[0]?.message?.content || '';
   } finally {
     clearTimeout(timer);
   }
@@ -258,7 +293,66 @@ export async function generateImageServer(
 
   // OpenAI-compatible gateways may expose image output through Chat
   // Completions (including PesatRouter), not /images/generations.
-  const tryChatImage = model.includes('gpt-image') || new URL(baseUrl).hostname === 'api.pesatrouter.com';
+  const isOpenAI = new URL(baseUrl).hostname === 'api.openai.com';
+  const isGptImage = /^gpt-image-/i.test(model);
+  const tryChatImage = !isOpenAI && (isGptImage || new URL(baseUrl).hostname === 'api.pesatrouter.com');
+
+  // OpenAI's image edits endpoint lets the final image model inspect the
+  // actual visual references. This is materially stronger than passing only
+  // a text summary of those references to the generation endpoint.
+  if (isOpenAI && isGptImage && options?.referenceImages?.length) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const form = new FormData();
+      form.append('model', model);
+      form.append('prompt', `${prompt}\n\nAnalyze every supplied image for its intended role. When the prompt identifies the first image as a current draft, revise that draft substantially according to the critique. Treat all other images as style and quality references only. Extract their shared premium design language and create original artwork; do not trace or reproduce an existing reference mark.`);
+      form.append('n', '1');
+      form.append('size', options.size || '1536x1024');
+      form.append('quality', model.startsWith('gpt-image-2.5') ? 'max' : 'high');
+      form.append('background', 'transparent');
+      form.append('output_format', 'png');
+      form.append('input_fidelity', 'high');
+
+      let attached = 0;
+      for (const [index, source] of options.referenceImages.slice(0, 11).entries()) {
+        try {
+          const response = await fetch(source);
+          if (!response.ok) continue;
+          const blob = await response.blob();
+          if (!/^image\/(?:png|jpeg|webp)$/i.test(blob.type) || blob.size > 5_000_000) continue;
+          form.append('image[]', blob, `reference-${index + 1}.${blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg'}`);
+          attached++;
+        } catch {
+          // Skip a malformed reference; remaining images still contribute.
+        }
+      }
+
+      if (attached > 0) {
+        const res = await fetch(providerEndpoint(baseUrl, 'images/edits'), {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${apiKey}` },
+          body: form,
+          signal: controller.signal,
+        });
+        if (res.ok) {
+          const data = await res.json() as { data?: Array<{ b64_json?: string; url?: string; revised_prompt?: string }> };
+          const image = data.data?.[0];
+          const url = image?.url || (image?.b64_json ? `data:image/png;base64,${image.b64_json}` : '');
+          if (url) return { url, revisedPrompt: image?.revised_prompt || prompt };
+        } else {
+          const errorBody = await res.text();
+          console.warn(`OpenAI reference-image edit failed (${res.status}): ${errorBody.slice(0, 300)}`);
+        }
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.warn('OpenAI reference-image edit timed out; falling back to text-to-image generation.');
+      }
+    } finally {
+      clearTimeout(timer);
+    }
+  }
   if (tryChatImage) {
     try {
       const controller = new AbortController();
@@ -275,7 +369,7 @@ export async function generateImageServer(
           messages: [{ role: 'user', content: options?.referenceImages?.length
             ? [
                 { type: 'text', text: `${prompt}\n\nUse the attached images only as visual quality/style references. Create an original mark; do not copy them.` },
-                ...options.referenceImages.slice(0, 3).map((url) => ({ type: 'image_url', image_url: { url } })),
+                ...options.referenceImages.slice(0, 10).map((url) => ({ type: 'image_url', image_url: { url } })),
               ]
             : prompt }],
           modalities: ['text', 'image'],
@@ -344,7 +438,15 @@ export async function generateImageServer(
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
         },
-        body: JSON.stringify({
+        body: JSON.stringify(isGptImage ? {
+          model,
+          prompt,
+          n: 1,
+          size: options?.size || '1536x1024',
+          quality: model.startsWith('gpt-image-2.5') ? 'max' : 'high',
+          background: 'transparent',
+          output_format: 'png',
+        } : {
           model,
           prompt,
           n: 1,

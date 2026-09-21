@@ -91,7 +91,12 @@ export interface AdminSettings {
   imageSize: '1024x1024' | '1792x1024' | '1024x1792';
   autoApprove: boolean;
   knowledgeBaseEnabled: boolean;
-}
+  paypalClientId?: string;
+  paypalClientSecret?: string;
+  paypalClientSecretConfigured?: boolean;
+  paypalClientSecretMasked?: string;
+  paypalMode?: 'sandbox' | 'live';
+  paypalWebhookId?: string;}
 
 export async function getSettings(): Promise<AdminSettings> {
   return adminCall<AdminSettings>('settings');
@@ -99,6 +104,10 @@ export async function getSettings(): Promise<AdminSettings> {
 
 export async function updateSettings(settings: Partial<AdminSettings>): Promise<AdminSettings> {
   return adminCall<AdminSettings>('settings', 'PUT', settings);
+}
+
+export async function testPayPal(params: { clientId?: string; clientSecret?: string; mode?: 'sandbox' | 'live' }): Promise<{ connected: boolean; mode: string; appId?: string; error?: string; message?: string }> {
+  return adminCall('paypal-test', 'POST', params);
 }
 
 // ─── Knowledge Base API ─────────────────────────────────

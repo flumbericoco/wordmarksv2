@@ -29,6 +29,28 @@ const pricingPlans = [
   { name: 'Scale', monthly: '$17', monthlyCredits: '28', effective: '$0.61', featured: false },
 ];
 
+async function makeReviewPreview(imageUrl: string): Promise<string> {
+  if (!imageUrl.startsWith('data:image/') || imageUrl.startsWith('data:image/svg+xml')) return imageUrl;
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => {
+      const maxSide = 768;
+      const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const context = canvas.getContext('2d');
+      if (!context) return resolve(imageUrl);
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', 0.82));
+    };
+    image.onerror = () => resolve(imageUrl);
+    image.src = imageUrl;
+  });
+}
+
 export default function Home() {
   const { confirm } = useNotifications();
   const [view, setView] = useState<'wizard' | 'result'>('wizard');
@@ -50,10 +72,12 @@ export default function Home() {
     if (!best || review.overall >= best.review.overall) {
       bestCandidate.current = { logo: candidate, review };
       setQualityReview(review);
+      try { sessionStorage.setItem('wordmarks:last-review', JSON.stringify({ generationId: candidate.generationId, review })); } catch { /* non-critical */ }
       return;
     }
     setLogo(best.logo);
     setQualityReview(best.review);
+    try { sessionStorage.setItem('wordmarks:last-review', JSON.stringify({ generationId: best.logo.generationId, review: best.review })); } catch { /* non-critical */ }
     setError(`The new revision scored ${review.overall}/10, below your best ${best.review.overall}/10. The best version was restored automatically.`);
     if (wizardData) rememberResult(wizardData, research, best.logo, iteration);
   };
@@ -115,6 +139,14 @@ export default function Home() {
         setWizardData(parsed.data);
         setResearch(parsed.research || '');
         setLogo(parsed.logo);
+        const savedReview = sessionStorage.getItem('wordmarks:last-review');
+        if (savedReview) {
+          const reviewState = JSON.parse(savedReview) as { generationId?: string; review?: QualityScore };
+          if (reviewState.generationId === parsed.logo.generationId && reviewState.review) {
+            bestCandidate.current = { logo: parsed.logo, review: reviewState.review };
+            setQualityReview(reviewState.review);
+          }
+        }
         setIteration(parsed.iteration || 0);
         setView('result');
       } catch {
@@ -156,7 +188,8 @@ export default function Home() {
       if (result.qualityReview) {
         applyQualityReview(result, result.qualityReview);
       } else if (autoReview) {
-        const review = await reviewLogo(result.imageUrl, data.brandName, data.description).catch(() => null);
+        const preview = await makeReviewPreview(result.imageUrl);
+        const review = await reviewLogo(preview, data.brandName, data.description, result.generationId).catch(() => null);
         if (review) applyQualityReview(result, review);
       }
     } catch (e: unknown) {
@@ -181,9 +214,21 @@ export default function Home() {
       rememberResult(wizardData, research, result, nextIteration);
       if (result.qualityReview) {
         applyQualityReview(result, result.qualityReview);
-      } else if (autoReview) {
-        const review = await reviewLogo(result.imageUrl, wizardData.brandName, wizardData.description).catch(() => null);
+      } else {
+        // A paid revision must always be compared with the previous best so a
+        // weaker result can never silently replace it. The auto-review setting
+        // controls initial generations, not regression protection.
+        const preview = await makeReviewPreview(result.imageUrl);
+        const review = await reviewLogo(preview, wizardData.brandName, wizardData.description, result.generationId).catch(() => null);
         if (review) applyQualityReview(result, review);
+        else {
+          const best = bestCandidate.current;
+          if (best) {
+            setLogo(best.logo);
+            setQualityReview(best.review);
+            setError('The revision could not be verified, so your previous best version was restored.');
+          }
+        }
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Regeneration failed');
@@ -198,7 +243,8 @@ export default function Home() {
     setIsReviewing(true);
     setError(null);
     try {
-      const review = await reviewLogo(logo.imageUrl, wizardData.brandName, wizardData.description);
+      const preview = await makeReviewPreview(logo.imageUrl);
+      const review = await reviewLogo(preview, wizardData.brandName, wizardData.description, logo.generationId);
       applyQualityReview(logo, review);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Review failed');
@@ -214,7 +260,29 @@ export default function Home() {
     setIsGenerating(true);
     setError(null);
     try {
-      const result = await generateLogo(wizardData, research, undefined, qualityReview.suggestions);
+      const lowestScore = Math.min(...Object.values(qualityReview.scores));
+      const needsConceptReset = qualityReview.overall < 8 || lowestScore < 8;
+      // Weak concepts should be replaced, not polished. Once the concept has
+      // cleared the commercial floor, send it back for targeted refinement.
+      const currentDraft = needsConceptReset ? null : await makeReviewPreview(logo.imageUrl);
+      const refinementData: WizardData = {
+        ...wizardData,
+        referenceImages: currentDraft ? [currentDraft] : [],
+      };
+      const result = await generateLogo(
+        refinementData,
+        research,
+        undefined,
+        [
+          needsConceptReset
+            ? `CONCEPT RESET REQUIRED. The previous direction scored ${qualityReview.overall}/10 with a lowest category of ${lowestScore}/10. Discard its core symbol and visual metaphor completely. Do not reuse, remix, or cosmetically alter it. Explore a fundamentally different, more proprietary direction from the private Instructions and all ten knowledge-base references.`
+            : 'The first attached image is the current logo draft. Preserve only its strongest recognizable parts but materially redesign every cited weakness.',
+          `STRICT REVIEW FEEDBACK: ${qualityReview.feedback}`,
+          `CURRENT SCORES: ${Object.entries(qualityReview.scores).map(([key, value]) => `${key} ${value}/10`).join(', ')}. Every category must improve; none may regress.`,
+          'Resolve originality, symbol construction, custom typography, optical kerning, spacing, monochrome/favIcon behavior, memorability, authority, timelessness, and premium finish. Do not return a near-duplicate.',
+          ...qualityReview.suggestions,
+        ],
+      );
       setLogo(result);
       setQualityReview(null);
       const nextIteration = iteration + 1;
@@ -222,9 +290,18 @@ export default function Home() {
       rememberResult(wizardData, research, result, nextIteration);
       if (result.qualityReview) {
         applyQualityReview(result, result.qualityReview);
-      } else if (autoReview) {
-        const review = await reviewLogo(result.imageUrl, wizardData.brandName, wizardData.description).catch(() => null);
+      } else {
+        const preview = await makeReviewPreview(result.imageUrl);
+        const review = await reviewLogo(preview, wizardData.brandName, wizardData.description, result.generationId).catch(() => null);
         if (review) applyQualityReview(result, review);
+        else {
+          const best = bestCandidate.current;
+          if (best) {
+            setLogo(best.logo);
+            setQualityReview(best.review);
+            setError('The revision could not be verified, so your previous best version was restored.');
+          }
+        }
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Iteration failed');
@@ -240,17 +317,49 @@ export default function Home() {
       const downloadImageUrl = format === 'svg' && !logo.imageUrl.startsWith('data:image/svg+xml')
         ? (await vectorizeLogo(logo.imageUrl, wizardData.brandName, wizardData.description)).imageUrl
         : logo.imageUrl;
-      const response = await fetch(downloadImageUrl);
-      let blob = await response.blob();
-      if (format === 'png' && logo.imageUrl.startsWith('data:image/svg+xml')) {
-        const sourceUrl = URL.createObjectURL(blob);
+      const isSvgDataUrl = downloadImageUrl.startsWith('data:image/svg+xml');
+      const isDataUrl = downloadImageUrl.startsWith('data:');
+      let blob: Blob;
+      if (isDataUrl) {
+        const comma = downloadImageUrl.indexOf(',');
+        if (comma < 0) throw new Error('Invalid image data URL');
+        const metadata = downloadImageUrl.slice(5, comma);
+        const encoded = downloadImageUrl.slice(comma + 1);
+        const mimeType = metadata.split(';')[0] || 'application/octet-stream';
+        if (/;base64/i.test(metadata)) {
+          const binary = atob(encoded);
+          const bytes = new Uint8Array(binary.length);
+          for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
+          blob = new Blob([bytes], { type: mimeType });
+        } else {
+          blob = new Blob([decodeURIComponent(encoded)], { type: mimeType });
+        }
+      } else {
+        const response = await fetch(downloadImageUrl);
+        if (!response.ok) throw new Error(`Download failed (${response.status})`);
+        blob = await response.blob();
+      }
+      if (format === 'png' && isSvgDataUrl) {
+        const svgText = await blob.text();
+        const parsed = new DOMParser().parseFromString(svgText, 'image/svg+xml');
+        if (parsed.querySelector('parsererror')) throw new Error('The generated SVG is invalid');
+        const svg = parsed.documentElement;
+        const viewBox = (svg.getAttribute('viewBox') || '0 0 1200 500').trim().split(/[\s,]+/).map(Number);
+        const sourceWidth = viewBox.length === 4 && viewBox[2] > 0 ? viewBox[2] : 1200;
+        const sourceHeight = viewBox.length === 4 && viewBox[3] > 0 ? viewBox[3] : 500;
+        const outputWidth = 2400;
+        const outputHeight = Math.max(1, Math.round(outputWidth * sourceHeight / sourceWidth));
+        const sourceUrl = URL.createObjectURL(new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' }));
         try {
           const image = new Image();
-          image.src = sourceUrl;
-          await image.decode();
+          await new Promise<void>((resolve, reject) => {
+            image.onload = () => resolve();
+            image.onerror = () => reject(new Error('Could not render SVG for PNG download'));
+            image.src = sourceUrl;
+          });
           const canvas = document.createElement('canvas');
-          canvas.width = 2400;
-          canvas.height = 1600;
+          canvas.width = outputWidth;
+          canvas.height = outputHeight;
           const context = canvas.getContext('2d');
           if (!context) throw new Error('PNG conversion is unavailable');
           context.drawImage(image, 0, 0, canvas.width, canvas.height);
@@ -266,14 +375,15 @@ export default function Home() {
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
-      URL.revokeObjectURL(url);
-    } catch {
-      window.open(logo.imageUrl, '_blank', 'noopener,noreferrer');
+      window.setTimeout(() => URL.revokeObjectURL(url), 2_000);
+    } catch (downloadError) {
+      setError(downloadError instanceof Error ? downloadError.message : 'Logo download failed. Please try again.');
     }
   };
 
   const handleNewLogo = () => {
     sessionStorage.removeItem('wordmarks:last-result');
+    sessionStorage.removeItem('wordmarks:last-review');
     localStorage.removeItem('wordmarks:draft');
     setView('wizard');
     setLogo(null);
@@ -325,7 +435,7 @@ export default function Home() {
                   </a>
                   <span className="text-xs font-semibold uppercase tracking-[0.14em] text-black/65">No design skills needed</span>
                 </div>
-                <p className="mt-4 text-xs text-black/65">Create an account and receive 10 beta credits. One successful logo generation uses one credit.</p>
+                <p className="mt-4 text-xs text-black/65">Direct purchase · No free trial. Start instantly with 25 credits for $25 via PayPal or card. One logo generation uses one credit.</p>
               </div>
 
               <div className="relative mx-auto aspect-square w-full max-w-[380px] lg:justify-self-end">
@@ -414,7 +524,7 @@ export default function Home() {
                     Logos from your AI agent.
                   </h2>
                   <p className="mt-6 max-w-xl text-base leading-7 text-black/60">
-                    Connect Wordmarks once, then create production-ready SVG logos from Codex, Kilo, Zcode, Claude Code, or any MCP-compatible CLI using natural language.
+                    Connect Wordmarks once, then create production-ready PNG logos or editable SVG exports from Codex, Kilo, Zcode, Claude Code, or any MCP-compatible CLI using natural language.
                   </p>
                   <div className="mt-7 flex flex-wrap gap-2" role="list" aria-label="Compatible AI agents">
                     {['Codex', 'Kilo', 'Zcode', 'Claude Code', 'Any MCP client'].map((agent) => (
@@ -438,7 +548,7 @@ export default function Home() {
                     <p className="mt-4 text-white/35"># Available tool</p>
                     <p className="text-white">generate_wordmark_logo</p>
                     <p className="mt-4 text-white/35"># Then just ask your agent</p>
-                    <p className="text-white">&quot;Create a bold blue wordmark for Orbit Labs and save it as SVG.&quot;</p>
+                    <p className="text-white">&quot;Create a bold blue wordmark for Orbit Labs and save the returned PNG.&quot;</p>
                   </div>
                   <div className="grid gap-3 border-t border-white/10 pt-5 sm:grid-cols-3">
                     {[
@@ -481,13 +591,13 @@ export default function Home() {
               <div className="mx-auto max-w-7xl">
                 <div className="grid gap-6 border-b border-black/15 pb-10 lg:grid-cols-[1fr_0.8fr] lg:items-end">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#5b42d5]">Simple pricing</p>
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#5b42d5]">Direct purchase · No free trial</p>
                     <h2 className="mt-4 max-w-3xl text-5xl font-black leading-[0.9] tracking-[-0.065em] sm:text-7xl">
                       Start with 25 logos for $25.
                     </h2>
                   </div>
                   <p className="max-w-xl text-base leading-7 text-black/55 lg:justify-self-end">
-                    Top up anytime. Credits never expire. Keep your account active from only $1 a month and receive fresh credits every month.
+                    Pay with PayPal or card. Direct purchase only — no free trial. Unused credits never expire. Keep your account active from only $1 a month and receive fresh credits every month.
                   </p>
                 </div>
 
@@ -530,7 +640,7 @@ export default function Home() {
                 </div>
 
                 <div className="mt-7 grid gap-3 rounded-2xl border border-black/10 bg-white/40 p-5 text-sm text-black/60 sm:grid-cols-3">
-                  <p><strong className="text-black">One credit, one logo.</strong><br />No confusing token math.</p>
+                  <p><strong className="text-black">No free trial. Direct purchase.</strong><br />Start instantly with 25 credits for $25.</p>
                   <p><strong className="text-black">Use them anytime.</strong><br />Unused credits roll over forever.</p>
                   <p><strong className="text-black">No lock-in.</strong><br />Change plans or cancel whenever you want.</p>
                 </div>
@@ -583,7 +693,7 @@ export default function Home() {
                   </div>
                   <div>
                     <p className="text-lg font-bold">Crafting your wordmark...</p>
-                    <p className="mt-1 text-sm text-white/40">Preparing prompt → generating → validating SVG → saving</p>
+                    <p className="mt-1 text-sm text-white/40">Preparing direction → generating image → reviewing quality → saving</p>
                   </div>
                 </div>
               ) : (

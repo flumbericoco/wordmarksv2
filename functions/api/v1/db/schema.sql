@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS generation_jobs (
   model TEXT,
   prompt TEXT,
   result_url TEXT,
+  r2_key TEXT,
   quality_score REAL,
   error TEXT,
   duration_ms INTEGER,
@@ -167,6 +168,20 @@ CREATE TABLE IF NOT EXISTS payment_transactions (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Persistent reviewer feedback used to avoid repeating weak concepts.
+CREATE TABLE IF NOT EXISTS quality_learnings (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  generation_id TEXT REFERENCES generation_jobs(id) ON DELETE SET NULL,
+  brand_key TEXT NOT NULL,
+  brand_name TEXT NOT NULL,
+  overall REAL NOT NULL,
+  scores TEXT NOT NULL DEFAULT '{}',
+  feedback TEXT NOT NULL DEFAULT '',
+  suggestions TEXT NOT NULL DEFAULT '[]',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_sessions_token ON user_sessions(token_hash);
 CREATE INDEX IF NOT EXISTS idx_auth_tokens_lookup ON auth_tokens(token_hash, purpose, expires_at);
 CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
@@ -177,3 +192,4 @@ CREATE INDEX IF NOT EXISTS idx_payment_events_status ON payment_events(status, c
 CREATE INDEX IF NOT EXISTS idx_payment_transactions_user ON payment_transactions(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_payment_transactions_intent ON payment_transactions(stripe_payment_intent_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_payment_transactions_invoice ON payment_transactions(stripe_invoice_id) WHERE stripe_invoice_id IS NOT NULL AND stripe_invoice_id <> '';
+CREATE INDEX IF NOT EXISTS idx_quality_learnings_lookup ON quality_learnings(user_id, brand_key, created_at);

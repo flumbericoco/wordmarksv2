@@ -4,20 +4,20 @@ import { successResponse, errorResponse, ValidationError, UnauthorizedError } fr
 import { validateSettingsRequest, type SettingsRequest } from '../../../lib/validation';
 import { authenticateRequest } from '../auth';
 import { recordAudit } from '../audit';
+import { ELITE_LOGO_DESIGNER_INSTRUCTIONS } from '../../../lib/elite-logo-instructions';
 
 interface Env {
   DB: D1Database;
   WORDMARKS_KV: KVNamespace;
   WORDMARKS_MCP_TOKEN?: string;
-}
-
-interface FunctionContext {
-  request: Request;
-  env: Env;
+  PAYPAL_CLIENT_ID?: string;
+  PAYPAL_CLIENT_SECRET?: string;
+  PAYPAL_MODE?: string;
+  PAYPAL_WEBHOOK_ID?: string;
 }
 
 const DEFAULT_SETTINGS: Record<string, string> = {
-  systemPrompt: `You are the Pesat AI Logo Creator: a world-class identity designer. Create one original, iconic logo with the finish of a senior branding studio. Translate the business idea into a memorable symbol and a custom, perfectly kerned wordmark. Preserve exact spelling. Prefer bold simple geometry, meaningful negative space, optical balance, and a restrained palette. Return only the finished logo on a transparent background—never a mockup, poster, presentation board, explanation, or prompt.`,
+  systemPrompt: ELITE_LOGO_DESIGNER_INSTRUCTIONS,
   negativePrompt: 'generic stock icon, clipart, template logo, mockup, poster, grid, watermark, tagline, extra text, misspelling, glow, bevel, 3D, photorealistic scene, busy detail',
   defaultProviderId: '',
   maxIterations: '3',
@@ -25,7 +25,35 @@ const DEFAULT_SETTINGS: Record<string, string> = {
   imageSize: '1024x1024',
   autoApprove: 'false',
   knowledgeBaseEnabled: 'true',
+  paypalClientId: '',
+  paypalClientSecret: '',
+  paypalMode: 'sandbox',
+  paypalWebhookId: '',
 };
+
+function formatSettingsResponse(settings: Record<string, unknown>, env: Env) {
+  const paypalClientId = String(settings.paypalClientId || env.PAYPAL_CLIENT_ID || '');
+  const paypalClientSecret = String(settings.paypalClientSecret || env.PAYPAL_CLIENT_SECRET || '');
+  const rawMode = String(settings.paypalMode || env.PAYPAL_MODE || 'sandbox').toLowerCase();
+  const paypalMode = rawMode === 'live' ? 'live' : 'sandbox';
+  const paypalWebhookId = String(settings.paypalWebhookId || env.PAYPAL_WEBHOOK_ID || '');
+
+  return {
+    systemPrompt: settings.systemPrompt || DEFAULT_SETTINGS.systemPrompt,
+    negativePrompt: settings.negativePrompt || DEFAULT_SETTINGS.negativePrompt,
+    defaultProviderId: settings.defaultProviderId || '',
+    maxIterations: parseInt(String(settings.maxIterations)) || 3,
+    imageQuality: settings.imageQuality || 'hd',
+    imageSize: settings.imageSize || '1024x1024',
+    autoApprove: settings.autoApprove === 'true',
+    knowledgeBaseEnabled: settings.knowledgeBaseEnabled !== 'false',
+    paypalClientId,
+    paypalClientSecretConfigured: Boolean(paypalClientSecret),
+    paypalClientSecretMasked: paypalClientSecret ? `••••••••••••${paypalClientSecret.slice(-4)}` : '',
+    paypalMode,
+    paypalWebhookId,
+  };
+}
 
 export const onRequest: PagesFunction<Env> = async (context) => {
   const { request, env } = context;
@@ -43,17 +71,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       for (const row of results) {
         settings[row.key as string] = row.value;
       }
-      // Parse typed values
-      return successResponse({
-        systemPrompt: settings.systemPrompt || DEFAULT_SETTINGS.systemPrompt,
-        negativePrompt: settings.negativePrompt || DEFAULT_SETTINGS.negativePrompt,
-        defaultProviderId: settings.defaultProviderId || '',
-        maxIterations: parseInt(String(settings.maxIterations)) || 3,
-        imageQuality: settings.imageQuality || 'hd',
-        imageSize: settings.imageSize || '1024x1024',
-        autoApprove: settings.autoApprove === 'true',
-        knowledgeBaseEnabled: settings.knowledgeBaseEnabled !== 'false',
-      }, requestId);
+      return successResponse(formatSettingsResponse(settings, env), requestId);
     }
 
     if (request.method === 'PUT' || request.method === 'POST') {
@@ -66,6 +84,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
       for (const [key, value] of Object.entries(updates)) {
         if (value !== undefined) {
+          // If updating client secret, don't overwrite with empty string if already set
+          if (key === 'paypalClientSecret' && String(value).trim() === '') {
+            continue;
+          }
           stmts.push(
             env.DB.prepare(
               `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))
@@ -77,7 +99,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
       if (stmts.length > 0) {
         await env.DB.batch(stmts);
-        await recordAudit(env.DB, auth.actor, 'update_settings', 'settings', undefined, updates);
+        const auditUpdates = { ...updates };
+        if (auditUpdates.paypalClientSecret) auditUpdates.paypalClientSecret = '[REDACTED]';
+        await recordAudit(env.DB, auth.actor, 'update_settings', 'settings', undefined, auditUpdates);
       }
 
       // Return updated settings
@@ -87,16 +111,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         settings[row.key as string] = row.value;
       }
 
-      return successResponse({
-        systemPrompt: settings.systemPrompt || DEFAULT_SETTINGS.systemPrompt,
-        negativePrompt: settings.negativePrompt || DEFAULT_SETTINGS.negativePrompt,
-        defaultProviderId: settings.defaultProviderId || '',
-        maxIterations: parseInt(String(settings.maxIterations)) || 3,
-        imageQuality: settings.imageQuality || 'hd',
-        imageSize: settings.imageSize || '1024x1024',
-        autoApprove: settings.autoApprove === 'true',
-        knowledgeBaseEnabled: settings.knowledgeBaseEnabled !== 'false',
-      }, requestId);
+      return successResponse(formatSettingsResponse(settings, env), requestId);
     }
 
     throw new ValidationError(`Method ${request.method} not allowed`);

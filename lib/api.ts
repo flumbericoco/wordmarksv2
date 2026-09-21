@@ -88,12 +88,14 @@ export async function reviewLogo(
   imageUrl: string,
   brandName: string,
   description?: string,
+  generationId?: string,
   _userApiKey?: string, // Ignored - keys are server-side only
 ): Promise<QualityScore> {
   return apiCall<QualityScore>('review-logo', {
     imageUrl,
     brandName,
     description,
+    generationId,
   });
 }
 

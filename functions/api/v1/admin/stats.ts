@@ -2,15 +2,20 @@
 
 import { successResponse, errorResponse, UnauthorizedError } from '../../../lib/errors';
 import { authenticateRequest } from '../auth';
+import { getPayPalConfig } from '../../../lib/paypal';
 
 interface Env {
   DB: D1Database;
   WORDMARKS_KV: KVNamespace;
   WORDMARKS_MCP_TOKEN?: string;
   OPENAI_API_KEY?: string;
+  OPENAI_IMAGE_API_KEY?: string;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   RESEND_API_KEY?: string;
+  PAYPAL_CLIENT_ID?: string;
+  PAYPAL_CLIENT_SECRET?: string;
+  PAYPAL_MODE?: string;
 }
 
 interface FunctionContext {
@@ -34,7 +39,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
 
     // Parallel queries for dashboard stats
-    const [providerCount, jobStats, kbCount, recentJobs] = await Promise.all([
+    const [providerCount, jobStats, kbCount, recentJobs, paypalConfig] = await Promise.all([
       env.DB.prepare('SELECT COUNT(*) as count FROM providers').first<{ count: number }>(),
       env.DB.prepare(
         `SELECT
@@ -49,16 +54,26 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         `SELECT id, brand_name, status, model, duration_ms, quality_score, created_at, completed_at
          FROM generation_jobs ORDER BY created_at DESC LIMIT 10`
       ).all(),
+      getPayPalConfig(env.DB, env),
     ]);
 
     const activeProvider = await env.DB.prepare(
       'SELECT name, text_model, image_model FROM providers WHERE is_active = 1 LIMIT 1'
     ).first<{ name: string; text_model: string; image_model: string }>();
 
+    let environment = 'Unconfigured';
+    if (paypalConfig.configured) {
+      environment = paypalConfig.mode === 'live' ? 'Live' : 'Sandbox';
+    } else if (env.STRIPE_SECRET_KEY) {
+      environment = env.STRIPE_SECRET_KEY.startsWith('sk_test_') ? 'Sandbox' : 'Live';
+    }
+
     return successResponse({
       providers: {
-        total: providerCount?.count || (env.OPENAI_API_KEY ? 1 : 0),
-        active: activeProvider || (env.OPENAI_API_KEY ? { name: 'PesatRouter (environment)', text_model: 'pesat-pro', image_model: '' } : null),
+        total: providerCount?.count || (env.OPENAI_IMAGE_API_KEY ? 1 : 0),
+        active: env.OPENAI_IMAGE_API_KEY
+          ? { name: 'OpenAI (environment)', text_model: 'gpt-5.6-sol', image_model: 'gpt-image-2.5-sunburst' }
+          : activeProvider,
       },
       generation: {
         total: jobStats?.total || 0,
@@ -72,13 +87,12 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       recentJobs: recentJobs.results || [],
       services: {
         database: 'up',
-        ai: env.OPENAI_API_KEY ? 'configured' : 'missing',
-        stripe: env.STRIPE_SECRET_KEY && env.STRIPE_WEBHOOK_SECRET ? 'configured' : 'missing',
+        ai: env.OPENAI_IMAGE_API_KEY ? 'configured' : 'missing',
+        paypal: paypalConfig.configured ? `${paypalConfig.mode} configured` : 'missing',
+        stripe: env.STRIPE_SECRET_KEY ? 'configured' : 'missing',
         email: env.RESEND_API_KEY ? 'configured' : 'missing',
       },
-      environment: env.STRIPE_SECRET_KEY
-        ? (env.STRIPE_SECRET_KEY.startsWith('sk_test_') ? 'Sandbox' : 'Live')
-        : 'Unconfigured',
+      environment,
     }, requestId);
   } catch (err) {
     return errorResponse(err, requestId);

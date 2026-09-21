@@ -7,6 +7,7 @@ interface Env {
   WORDMARKS_KV: KVNamespace;
   WORDMARKS_MCP_TOKEN?: string;
   OPENAI_API_KEY?: string;
+  OPENAI_IMAGE_API_KEY?: string;
 }
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
@@ -14,7 +15,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   try {
     const auth = await authenticateRequest(request, env, true);
     if (!auth.isAdmin) throw new UnauthorizedError('Admin authentication required');
-    if (!env.OPENAI_API_KEY) throw new ValidationError('OPENAI_API_KEY is not configured');
+    const apiKey = env.OPENAI_IMAGE_API_KEY || env.OPENAI_API_KEY;
+    if (!apiKey) throw new ValidationError('No OpenAI API key is configured');
 
     const body: { baseUrl?: string; textModel?: string } = await request.json<{ baseUrl?: string; textModel?: string }>().catch(() => ({}));
     const baseUrl = String(body.baseUrl || '').replace(/\/$/, '');
@@ -25,11 +27,14 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const timer = setTimeout(() => controller.abort(), 15_000);
     let response: Response;
     try {
-      response = await fetch(`${baseUrl}/chat/completions`, {
+      const officialOpenAi = new URL(baseUrl).hostname === 'api.openai.com';
+      response = await fetch(`${baseUrl}/${officialOpenAi ? 'responses' : 'chat/completions'}`, {
         method: 'POST',
         signal: controller.signal,
-        headers: { Authorization: `Bearer ${env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: textModel, messages: [{ role: 'user', content: 'Reply with OK.' }], max_tokens: 8 }),
+        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(officialOpenAi
+          ? { model: textModel, input: 'Reply with OK.' }
+          : { model: textModel, messages: [{ role: 'user', content: 'Reply with OK.' }], max_tokens: 8 }),
         redirect: 'error',
       });
     } finally {

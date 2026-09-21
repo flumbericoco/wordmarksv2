@@ -127,6 +127,7 @@ export function buildIdentityLogoPrompt(
   options?: { variationSeed?: string; improvementNotes?: string[]; research?: string },
 ): string {
   const layout = data.layout || 'icon-word';
+  const pureWordmark = layout.trim().toLowerCase() === 'wordmark';
   const notes = options?.improvementNotes?.length
     ? `\nREVIEW IMPROVEMENTS:\n- ${options.improvementNotes.join('\n- ')}`
     : '';
@@ -134,16 +135,17 @@ export function buildIdentityLogoPrompt(
 
 BRAND BRIEF: ${data.description || 'A modern brand that needs a distinctive, trustworthy identity.'}
 STYLE: ${data.style || 'modern, confident, timeless'}
+${pureWordmark ? `ABSOLUTE PURE WORDMARK MODE: Render only the exact name "${data.brandName}" as one contiguous custom typographic mark. Do not create an icon, symbol, emblem, monogram, badge, initial, pictogram, or detached graphic anywhere. Express the brand idea only inside the letterforms through custom cuts, counters, ligatures, terminals, spacing, and kerning.` : ''}
 COLOR DIRECTION: ${data.colorPreference || 'a restrained professional palette with one accent color'}
-COMPOSITION: ${layout}. Unless the user explicitly selected a pure wordmark, create a distinctive abstract symbol plus a custom wordmark. The symbol must have a clear idea derived from the brand name, initials, purpose, or motion—not a generic stock icon.
+COMPOSITION: ${layout}. This is a binding layout choice. "stacked" means a centered symbol above the brand name; "symbol-wordmark", "horizontal", or "icon-word" means symbol beside the brand name; "wordmark" means no detached symbol. If the value is only a recommendation rather than an explicit choice, select the strongest horizontal or vertical lockup from the brand category and dominant reference composition. The symbol must have a clear idea derived from the brand name, initials, purpose, or motion—not a generic stock icon.
 VARIATION KEY: ${options?.variationSeed || 'initial-concept'}
 ${options?.research ? `STRATEGIC CONTEXT: ${options.research.slice(0, 1800)}` : ''}${notes}
 
 ART DIRECTION:
-- Deliver a compact standalone symbol + wordmark lockup, never a poster, banner, mockup, or presentation board.
+- Deliver one compact production lockup in the selected composition, never a poster, banner, mockup, or presentation board.
 - Spell "${data.brandName}" exactly once and keep it immediately readable.
 - Build the symbol from simple geometric vector shapes with a memorable silhouette and meaningful negative space.
-- Use consistent optical weight, spacing, corner language, and alignment. Keep the symbol-to-wordmark gap near one letter-width and every part of the brand name tightly contiguous.
+- Use consistent optical weight, spacing, corner language, and alignment. In horizontal layouts keep the symbol gap near one letter-width; in stacked layouts use a compact, deliberate vertical gap and center both elements optically. Keep every part of the brand name tightly contiguous.
 - Maximum three flat colors. No backgrounds, frames, grids, taglines, slogans, metadata, tiny labels, glow, filters, patterns, mockups, photos, shadows, bevels, 3D, mascots, or decorative clutter.
 - Transparent artboard: do not draw a full-canvas background rectangle.
 - Make it work at favicon size and in monochrome.
@@ -152,18 +154,18 @@ ART DIRECTION:
 }
 
 export function getVisualQualityReviewPrompt(svgMarkup: string, brandName: string, brief?: string): string {
-  return `Act as a strict senior identity designer. Review the actual generated SVG artwork below—not its generation prompt.
+  return `Act as a strict senior identity designer. Review the actual supplied logo artwork, not its generation prompt. If an image is attached, inspect that image directly. If SVG markup is present below, inspect the SVG.
 
 BRAND: ${brandName}
 BRIEF: ${brief || 'Not provided'}
 SVG ARTWORK:\n${svgMarkup.slice(0, 24000)}
 
-First verify the exact brand spelling, then evaluate simplicity, memorability, small-size scalability, authority, originality, timelessness, and overall professional finish. Penalize generic symbols, weak alignment, accidental clipping, illegible text, excessive detail, and mismatch with the brief.
+First verify the exact brand spelling. Then strictly evaluate simplicity, memorability, small-size scalability, authority and trust, originality and cleverness, timelessness, typography and optical kerning, premium finish, monochrome performance, favicon performance, and billion-dollar-brand feel. Penalize generic symbols, ordinary-font-plus-stock-icon construction, weak alignment, accidental clipping, illegible text, excessive detail, and mismatch with the brief or visual evidence. A score of 10 means exceptional production-ready work, not merely acceptable work. Do not inflate scores to satisfy the requested target.
 
 Return ONLY valid JSON:
 {"overall":7.5,"scores":{"simplicity":8,"memorability":7,"scalability":8,"authority":7,"cleverness":7,"timelessness":8,"billionDollarFeel":7},"feedback":"Concise evidence-based critique of the visible artwork.","suggestions":["Specific visual improvement 1","Specific visual improvement 2","Specific visual improvement 3"],"approved":false}
 
-Use numeric scores from 1 to 10. approved is true only when overall is at least 9 and no spelling or legibility problem exists.`;
+Use numeric scores from 1 to 10. Treat 10/10 in every category as the target. approved is true only when every listed category is 10 and there is no spelling, legibility, originality, or brief-alignment problem. Otherwise return concrete revision suggestions.`;
 }
 
 // ─── Quality Review Prompt ─────────────────────────────

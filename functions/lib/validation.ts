@@ -132,11 +132,12 @@ export interface ReviewRequest {
   imageUrl: string;
   brandName: string;
   description?: string;
+  generationId?: string;
 }
 
 export function validateReviewRequest(body: unknown): ValidationResult<ReviewRequest> {
   if (!isObject(body)) return { valid: false, error: 'Request body must be a JSON object' };
-  const { imageUrl, brandName, description } = body;
+  const { imageUrl, brandName, description, generationId } = body;
 
   if (!isString(imageUrl) || (!imageUrl.startsWith('data:image/') && !imageUrl.startsWith('https://')) || imageUrl.length > 7_000_000) {
     return { valid: false, error: 'A valid generated image is required' };
@@ -151,6 +152,7 @@ export function validateReviewRequest(body: unknown): ValidationResult<ReviewReq
       imageUrl,
       brandName: brandName.trim(),
       description: isString(description) ? description.trim() : undefined,
+      generationId: isString(generationId) && /^[a-f0-9-]{20,64}$/i.test(generationId) ? generationId : undefined,
     },
   };
 }
@@ -265,6 +267,10 @@ export interface SettingsRequest {
   imageSize?: '1024x1024' | '1792x1024' | '1024x1792';
   autoApprove?: boolean;
   knowledgeBaseEnabled?: boolean;
+  paypalClientId?: string;
+  paypalClientSecret?: string;
+  paypalMode?: 'sandbox' | 'live';
+  paypalWebhookId?: string;
 }
 
 export function validateSettingsRequest(body: unknown): ValidationResult<SettingsRequest> {

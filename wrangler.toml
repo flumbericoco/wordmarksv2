@@ -15,11 +15,20 @@ binding = "WORDMARKS_KV"
 id = "29de00d7b63e43b1adb2fdae89cc6a45"
 
 # ─── R2 Object Storage ───────────────────────────────────
-# R2 bindings are intentionally omitted for the free deployment without R2.
+# Enable these bindings after R2 has been activated for the Cloudflare account
+# and the two buckets have been created. Runtime code safely falls back while
+# they are absent.
+# [[r2_buckets]]
+# binding = "KB_BUCKET"
+# bucket_name = "wordmarks-knowledge"
+# [[r2_buckets]]
+# binding = "GENERATED_BUCKET"
+# bucket_name = "wordmarks-generated"
 
 # ─── Environment Variables ──────────────────────────────
 # Set these via wrangler pages secret put:
 #   OPENAI_API_KEY       - OpenAI API key (NEVER commit to repo)
+#   OPENAI_IMAGE_API_KEY - Dedicated OpenAI key for GPT Image (NEVER commit to repo)
 #   WORDMARKS_MCP_TOKEN  - Auth token for MCP agents
 #   ADMIN_PASSWORD       - Password for the protected Admin Studio
 #   STRIPE_SECRET_KEY    - Stripe server API key
@@ -29,4 +38,5 @@ id = "29de00d7b63e43b1adb2fdae89cc6a45"
 #
 # DO NOT add secrets here. Use:
 #   wrangler pages secret put OPENAI_API_KEY --project-name=wordmarks-v2
+#   wrangler pages secret put OPENAI_IMAGE_API_KEY --project-name=wordmarks-net
 #   wrangler pages secret put WORDMARKS_MCP_TOKEN --project-name=wordmarks-v2

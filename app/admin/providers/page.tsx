@@ -12,11 +12,7 @@ import {
 } from '@/lib/admin-api';
 
 const PRESETS: Partial<AdminProvider>[] = [
-  { name: 'PesatRouter', baseUrl: 'https://api.pesatrouter.com/v1', textModel: 'pesat-pro', imageModel: 'pesat-pro' },
-  { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', textModel: 'gpt-4o', imageModel: 'dall-e-3' },
-  { name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', textModel: 'openai/gpt-4o', imageModel: 'openai/dall-e-3' },
-  { name: 'Together AI', baseUrl: 'https://api.together.xyz/v1', textModel: 'meta-llama/Llama-3-70b-chat-hf', imageModel: 'stabilityai/stable-diffusion-xl' },
-  { name: 'Groq', baseUrl: 'https://api.groq.com/openai/v1', textModel: 'llama3-70b-8192', imageModel: '' },
+  { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', textModel: 'gpt-5.4', imageModel: 'gpt-image-2.5-sunburst' },
   { name: 'Custom', baseUrl: '', textModel: '', imageModel: '' },
 ];
 
@@ -116,7 +112,7 @@ export default function ProvidersPage() {
     setError(null);
     try {
       await testProvider({ baseUrl: form.baseUrl || '', textModel: form.textModel || '' });
-      notify('Connection successful. The provider accepted a chat completion request.', 'success');
+      notify('Connection successful. The provider accepted a text-model request.', 'success');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Connection test failed');
     } finally {
@@ -129,14 +125,14 @@ export default function ProvidersPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">API Providers</h1>
-          <p className="mt-1 text-sm text-zinc-400">Configure OpenAI-compatible API providers</p>
+          <p className="mt-1 text-sm text-black/50">Configure the text-model endpoint. Production image rendering always uses the dedicated OpenAI image key.</p>
         </div>
         <div className="flex gap-2">
           {PRESETS.map((preset) => (
             <button
               key={preset.name}
               onClick={() => handleAdd(preset)}
-              className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-zinc-400 hover:bg-white/5 hover:text-white transition-colors"
+              className="rounded-lg border border-black/15 px-3 py-1.5 text-xs text-black/60 hover:bg-black/5 transition-colors"
             >
               + {preset.name}
             </button>

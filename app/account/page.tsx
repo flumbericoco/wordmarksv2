@@ -31,7 +31,7 @@ export default function AccountPage() {
   const { confirm } = useNotifications();
   const [user, setUser] = useState<User | null>(null);
   const [keys, setKeys] = useState<ApiKey[]>([]);
-  const [mode, setMode] = useState<'login' | 'register'>('register');
+  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [newToken, setNewToken] = useState('');
@@ -41,11 +41,13 @@ export default function AccountPage() {
   const [message, setMessage] = useState(() => {
     if (typeof window === 'undefined') return '';
     const checkoutState = new URLSearchParams(window.location.search).get('checkout');
+    const paypalState = new URLSearchParams(window.location.search).get('paypal');
     const verificationState = new URLSearchParams(window.location.search).get('verification');
     if (new URLSearchParams(window.location.search).get('verified') === '1') return 'Email verified. Your account is now active.';
     if (verificationState === 'invalid') return 'This verification link is invalid or expired. Sign in and request a new one.';
     if (checkoutState === 'success') return 'Payment received. Credits may take a few seconds to appear.';
     if (checkoutState === 'cancelled') return 'Checkout cancelled. You were not charged.';
+    if (paypalState === 'cancelled') return 'PayPal checkout cancelled. You were not charged.';
     return '';
   });
   const [busy, setBusy] = useState(false);
@@ -92,6 +94,27 @@ export default function AccountPage() {
     const restoreFromHistory = () => setBusy(false);
     window.addEventListener('pageshow', restoreFromHistory);
     const timer = window.setTimeout(() => void load(), 0);
+
+    // Handle PayPal return
+    const params = new URLSearchParams(window.location.search);
+    const paypalState = params.get('paypal');
+    const paypalOrderId = params.get('order_id') || params.get('token');
+
+    if (paypalState === 'success' && paypalOrderId) {
+      setBusy(true);
+      api<{ ok: boolean; creditsAdded: number; newCredits: number }>('billing/paypal-capture-order', {
+        method: 'POST',
+        body: JSON.stringify({ orderId: paypalOrderId }),
+      }).then(async (res) => {
+        setMessage(`Payment received via PayPal! Added ${res.creditsAdded} credits to your account.`);
+        await load();
+      }).catch((err) => {
+        setMessage(err instanceof Error ? err.message : 'PayPal payment processing failed');
+      }).finally(() => {
+        setBusy(false);
+      });
+    }
+
     const awaitingPayment = new URLSearchParams(window.location.search).get('checkout') === 'success';
     let attempts = 0;
     const paymentPoller = awaitingPayment ? window.setInterval(() => {
@@ -193,6 +216,20 @@ export default function AccountPage() {
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Checkout unavailable'); setBusy(false); }
   }
 
+  async function paypalCheckout(product: string = 'topup') {
+    setBusy(true); setMessage('');
+    try {
+      const result = await api<{ url: string }>('billing/paypal-create-order', {
+        method: 'POST',
+        body: JSON.stringify({ product }),
+      });
+      window.location.assign(result.url);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'PayPal checkout unavailable');
+      setBusy(false);
+    }
+  }
+
   async function openBillingPortal() {
     setBusy(true); setMessage('');
     try {
@@ -251,15 +288,25 @@ export default function AccountPage() {
       <main className="grid min-h-screen place-items-center bg-[#d9d3ff] px-5 py-16 text-[#171714]">
         <div className="w-full max-w-md rounded-[2rem] border border-black/10 bg-[#f2f0e9] p-7 shadow-2xl sm:p-9">
           <Link href="/" className="text-xl font-black tracking-[-0.06em]">wordmarks<span className="text-[#ff5c35]">.</span></Link>
-          <p className="mt-10 text-xs font-black uppercase tracking-[0.18em] text-[#5b42d5]">Developer account</p>
+          <p className="mt-10 text-xs font-black uppercase tracking-[0.18em] text-[#5b42d5]">Direct purchase account</p>
           <h1 className="mt-3 text-4xl font-black tracking-[-0.06em]">{mode === 'register' ? 'Create your account.' : 'Welcome back.'}</h1>
+          <p className="mt-2 text-xs text-black/50">Direct purchase · No free trial. Buy credits to start generating.</p>
           <form className="mt-8 space-y-4" onSubmit={submitAuth}>
             <label className="block text-xs font-bold uppercase tracking-wider">Email<input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} className="mt-2 w-full rounded-xl border border-black/15 bg-white px-4 py-3 text-base font-normal normal-case tracking-normal outline-none focus:border-[#5b42d5]" /></label>
             <label className="block text-xs font-bold uppercase tracking-wider">Password<input type="password" minLength={10} required value={password} onChange={(event) => setPassword(event.target.value)} className="mt-2 w-full rounded-xl border border-black/15 bg-white px-4 py-3 text-base font-normal normal-case tracking-normal outline-none focus:border-[#5b42d5]" /></label>
             {message ? <p role="alert" className="text-sm text-red-700">{message}</p> : null}
             <button disabled={busy} className="w-full rounded-full bg-[#171714] px-5 py-3.5 text-sm font-black text-white disabled:opacity-50">{busy ? 'Please wait...' : mode === 'register' ? 'Create account' : 'Sign in'}</button>
           </form>
-          <button onClick={() => setMode(mode === 'register' ? 'login' : 'register')} className="mt-5 w-full text-sm text-black/55 underline underline-offset-4">{mode === 'register' ? 'Already registered? Sign in' : 'Need an account? Register'}</button>
+          <button
+            type="button"
+            onClick={() => {
+              setMode(mode === 'register' ? 'login' : 'register');
+              setMessage('');
+            }}
+            className="mt-5 w-full text-sm text-black/55 underline underline-offset-4"
+          >
+            {mode === 'register' ? 'Already registered? Sign in' : 'Need an account? Register'}
+          </button>
           {mode === 'login' ? <button type="button" onClick={requestReset} disabled={busy} className="mt-3 w-full text-sm text-black/55 underline underline-offset-4">Forgot password?</button> : null}
         </div>
       </main>
@@ -272,7 +319,10 @@ export default function AccountPage() {
         <header className="flex flex-wrap items-center justify-between gap-4 border-b border-black/10 pb-6">
           <Link href="/" className="text-2xl font-black tracking-[-0.06em]">wordmarks<span className="text-[#ff5c35]">.</span></Link>
           <div className="flex items-center gap-4 text-right">
-            <div><p className="text-sm font-bold">{user.email}</p><p className="text-xs text-black/45">{user.plan === 'none' ? 'Free beta' : `${user.plan} plan`}</p></div>
+            <div>
+              <p className="text-sm font-bold">{user.email}</p>
+              <p className="text-xs text-black/45">{user.plan === 'none' ? 'Standard account (0 credits)' : `${user.plan} plan`}</p>
+            </div>
             <button onClick={logout} className="rounded-full border border-black/15 px-4 py-2 text-xs font-bold">Sign out</button>
           </div>
         </header>
@@ -281,31 +331,79 @@ export default function AccountPage() {
           <div className="rounded-[2rem] bg-[#171714] p-7 text-white">
             <p className="text-xs font-black uppercase tracking-[0.18em] text-[#c6ff4a]">Available credits</p>
             <p className="mt-5 text-7xl font-black tracking-[-0.08em]">{user.credits}</p>
-            <p className="mt-3 text-sm text-white/45">One credit generates one logo. Unused credits never expire.</p>
-            <button disabled={busy} onClick={topup} className="mt-5 rounded-full bg-[#c6ff4a] px-5 py-3 text-xs font-black uppercase text-black disabled:opacity-50">Top up 25 credits · $25</button>
+            <p className="mt-3 text-sm text-white/50">One credit generates one logo. Direct purchase only · No free trial. Unused credits never expire.</p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <button
+                disabled={busy}
+                onClick={() => paypalCheckout('topup')}
+                className="rounded-full bg-[#003087] hover:bg-[#002466] px-5 py-3 text-xs font-black uppercase tracking-wider text-white disabled:opacity-50 transition-transform hover:-translate-y-0.5 flex items-center gap-2"
+              >
+                <span>Pay with PayPal</span>
+                <span className="rounded-full bg-[#c6ff4a] px-2 py-0.5 text-[10px] font-black text-black">25 Credits · $25</span>
+              </button>
+              <button
+                disabled={busy}
+                onClick={topup}
+                className="rounded-full border border-white/20 bg-white/10 hover:bg-white/20 px-4 py-3 text-xs font-bold uppercase text-white/90 disabled:opacity-50 transition-colors"
+              >
+                Card / Stripe
+              </button>
+            </div>
           </div>
+
           <div className="rounded-[2rem] border border-black/10 bg-white/60 p-7">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#5b42d5]">Choose your monthly credits</p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#5b42d5]">Choose your monthly plan</p>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-black/40">Direct purchase · Instant activation</span>
+            </div>
             <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
               {[['lite', '$1', '1'], ['growth', '$3', '4'], ['pro', '$7', '10'], ['scale', '$17', '28']].map(([plan, price, credits]) => (
-                <button key={plan} disabled={busy || Boolean(billing.subscription)} onClick={() => checkout(plan)} className={`rounded-2xl border bg-white p-4 text-left transition-transform hover:-translate-y-1 disabled:cursor-not-allowed disabled:opacity-50 ${requestedPlan===plan?'border-[#5b42d5] ring-4 ring-[#5b42d5]/10':'border-black/10'}`}>
-                  <span className="text-xs font-black uppercase">{plan}</span><strong className="mt-4 block text-2xl">{price}<small className="text-xs font-normal text-black/40">/mo</small></strong><span className="mt-1 block text-xs text-black/45">{credits} {credits === '1' ? 'credit' : 'credits'}/month</span>
-                </button>
+                <div key={plan} className={`rounded-2xl border bg-white p-4 text-left flex flex-col justify-between ${requestedPlan===plan?'border-[#5b42d5] ring-4 ring-[#5b42d5]/10':'border-black/10'}`}>
+                  <div>
+                    <span className="text-xs font-black uppercase">{plan}</span>
+                    <strong className="mt-2 block text-2xl">{price}<small className="text-xs font-normal text-black/40">/mo</small></strong>
+                    <span className="mt-1 block text-xs text-black/45">{credits} {credits === '1' ? 'credit' : 'credits'}/month</span>
+                  </div>
+                  <div className="mt-4 flex flex-col gap-1.5 pt-2 border-t border-black/5">
+                    <button
+                      disabled={busy || Boolean(billing.subscription)}
+                      onClick={() => paypalCheckout(plan)}
+                      className="w-full rounded-lg bg-[#003087] hover:bg-[#002466] py-1.5 text-center text-[10px] font-black text-white disabled:opacity-40"
+                    >
+                      PayPal
+                    </button>
+                    <button
+                      disabled={busy || Boolean(billing.subscription)}
+                      onClick={() => checkout(plan)}
+                      className="w-full rounded-lg border border-black/15 bg-black/5 hover:bg-black/10 py-1.5 text-center text-[10px] font-bold text-black disabled:opacity-40"
+                    >
+                      Card
+                    </button>
+                  </div>
+                </div>
               ))}
             </div>
-            <p className="mt-4 text-xs leading-5 text-black/55">Your selected plan is <strong>charged today</strong>, adds its monthly credits immediately, and renews monthly until cancelled. Need more? Top up 25 credits separately for $25.</p>
-            {billing.subscription ? <p className="mt-2 text-xs font-bold text-[#5b42d5]">You already have a plan. Use Manage billing below to change or cancel it.</p> : null}
+            <p className="mt-4 text-xs leading-5 text-black/55">Plans are charged immediately upon checkout and add credits straight to your account. Unused credits roll over. Cancel anytime.</p>
+            {billing.subscription ? <p className="mt-2 text-xs font-bold text-[#5b42d5]">You already have an active plan. Use Manage billing below to adjust.</p> : null}
           </div>
         </section>
 
-        {message ? <div role="status" className={`mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl p-4 text-sm ${message.startsWith('Payment received')||message.startsWith('Payment confirmed')?'bg-green-100 text-green-800':message.startsWith('Checkout cancelled')?'bg-amber-100 text-amber-800':'bg-red-100 text-red-800'}`}><span>{message}</span>{message.startsWith('Payment received')?<button onClick={() => void load(true)} className="font-bold underline">Check payment status</button>:null}</div> : null}
+        {message ? (
+          <div role="status" className={`mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl p-4 text-sm font-medium ${message.startsWith('Payment received')||message.startsWith('Payment confirmed')?'bg-green-100 text-green-800':message.startsWith('Checkout cancelled')||message.startsWith('PayPal checkout cancelled')?'bg-amber-100 text-amber-800':'bg-red-100 text-red-800'}`}>
+            <span>{message}</span>
+            {message.startsWith('Payment received') ? (
+              <button onClick={() => void load(true)} className="font-bold underline">Check payment status</button>
+            ) : null}
+          </div>
+        ) : null}
+
         <section className="mb-6 grid gap-5 md:grid-cols-2">
           <div className="rounded-[2rem] border border-black/10 bg-white/60 p-7">
             <div className="flex items-start justify-between gap-4">
               <div><p className="text-xs font-black uppercase tracking-[0.18em] text-[#5b42d5]">Subscription</p><h2 className="mt-2 text-3xl font-black capitalize">{billing.subscription?.plan || 'No active plan'}</h2></div>
               {billing.subscription ? <span className="rounded-full bg-[#c6ff4a] px-3 py-1 text-[10px] font-black uppercase">{billing.subscription.status}</span> : null}
             </div>
-            {billing.subscription?.currentPeriodEnd ? <p className="mt-4 text-sm text-black/55">{billing.subscription.cancelAtPeriodEnd ? 'Access until' : 'Next billing date'}: {new Date(billing.subscription.currentPeriodEnd).toLocaleDateString()}</p> : <p className="mt-4 text-sm text-black/45">{billing.subscription ? 'Billing schedule is available in the Stripe portal.' : 'Choose a plan above to activate monthly credits.'}</p>}
+            {billing.subscription?.currentPeriodEnd ? <p className="mt-4 text-sm text-black/55">{billing.subscription.cancelAtPeriodEnd ? 'Access until' : 'Next billing date'}: {new Date(billing.subscription.currentPeriodEnd).toLocaleDateString()}</p> : <p className="mt-4 text-sm text-black/45">{billing.subscription ? 'Billing active.' : 'Choose a plan above to activate monthly credits.'}</p>}
             {billing.subscription?.cancelAtPeriodEnd ? <p className="mt-2 text-sm font-bold text-orange-700">Cancellation is scheduled, but access remains active until the date above.</p> : null}
             {billing.subscription ? <div className="mt-5 flex flex-wrap gap-3"><button disabled={busy} onClick={openBillingPortal} className="rounded-full bg-[#171714] px-5 py-3 text-xs font-black uppercase tracking-wider text-white disabled:opacity-50">Manage billing</button>{billing.subscription.cancelAtPeriodEnd ? <button disabled={busy} onClick={cancelSubscriptionNow} className="rounded-full border border-red-600 px-5 py-3 text-xs font-black uppercase tracking-wider text-red-700 disabled:opacity-50">End subscription now</button> : null}</div> : null}
           </div>
@@ -319,12 +417,25 @@ export default function AccountPage() {
 
         {billing.invoices.length > 0 ? <section className="mb-6 rounded-[2rem] border border-black/10 bg-white/60 p-7">
           <p className="text-xs font-black uppercase tracking-[0.18em] text-[#5b42d5]">Payment history</p>
-          <div className="mt-4 divide-y divide-black/10">{billing.invoices.map((invoice) => <div key={invoice.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm"><div><p className="font-bold">{invoice.number || 'Stripe invoice'}</p><p className="text-xs text-black/45">{new Date(invoice.createdAt).toLocaleDateString()} · {invoice.status}</p></div><div className="flex items-center gap-4"><strong>{invoice.currency} {(invoice.amountPaid / 100).toFixed(2)}</strong>{invoice.hostedUrl ? <a href={invoice.hostedUrl} target="_blank" rel="noreferrer" className="text-xs font-bold underline">View receipt</a> : null}</div></div>)}</div>
+          <div className="mt-4 divide-y divide-black/10">{billing.invoices.map((invoice) => <div key={invoice.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm"><div><p className="font-bold">{invoice.number || 'Payment invoice'}</p><p className="text-xs text-black/45">{new Date(invoice.createdAt).toLocaleDateString()} · {invoice.status}</p></div><div className="flex items-center gap-4"><strong>{invoice.currency} {(invoice.amountPaid / 100).toFixed(2)}</strong>{invoice.hostedUrl ? <a href={invoice.hostedUrl} target="_blank" rel="noreferrer" className="text-xs font-bold underline">View receipt</a> : null}</div></div>)}</div>
         </section> : null}
+
         <section className="mb-6 rounded-[2rem] border border-black/10 bg-white/60 p-7">
           <p className="text-xs font-black uppercase tracking-[0.18em] text-[#5b42d5]">Logo history</p>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{generations.length===0?<p className="text-sm text-black/45">No saved logos yet.</p>:generations.map((item)=><article key={item.id} className="rounded-2xl border border-black/10 bg-white p-4">{item.result_url?<img src={item.result_url} alt={`${item.brand_name} logo`} className="aspect-square w-full rounded-xl bg-neutral-100 object-contain"/>:<div className="grid aspect-square place-items-center rounded-xl bg-neutral-100 text-sm text-black/45">{item.status}</div>}<div className="mt-3 flex items-center justify-between gap-3"><div><strong>{item.brand_name}</strong><p className="text-xs text-black/40">{new Date(`${item.created_at}Z`).toLocaleString()}</p></div>{item.result_url?<a href={item.result_url} download={`${item.brand_name}-logo.svg`} className="text-xs font-bold underline">Download</a>:null}</div>{item.status==='completed'?<div className="mt-3 flex items-center gap-1 border-t border-black/10 pt-3"><span className="mr-2 text-[11px] text-black/40">Rate</span>{[1,2,3,4,5].map((rating)=><button key={rating} onClick={() => void rateGeneration(item.id,rating)} aria-label={`Rate ${rating} out of 5`} className="text-lg text-amber-500">★</button>)}</div>:null}</article>)}</div>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {generations.length === 0 ? <p className="text-sm text-black/45">No saved logos yet.</p> : generations.map((item) => {
+              const extension = item.result_url?.startsWith('data:image/svg+xml') ? 'svg'
+                : item.result_url?.startsWith('data:image/webp') ? 'webp'
+                : item.result_url?.startsWith('data:image/jpeg') ? 'jpg' : 'png';
+              return <article key={item.id} className="rounded-2xl border border-black/10 bg-white p-4">
+                {item.result_url ? <img src={item.result_url} alt={`${item.brand_name} logo`} className="aspect-square w-full rounded-xl bg-neutral-100 object-contain"/> : <div className="grid aspect-square place-items-center rounded-xl bg-neutral-100 text-sm text-black/45">{item.status}</div>}
+                <div className="mt-3 flex items-center justify-between gap-3"><div><strong>{item.brand_name}</strong><p className="text-xs text-black/40">{new Date(`${item.created_at}Z`).toLocaleString()}</p></div>{item.result_url ? <a href={item.result_url} download={`${item.brand_name}-logo.${extension}`} className="text-xs font-bold underline">Download {extension.toUpperCase()}</a> : null}</div>
+                {item.status === 'completed' ? <div className="mt-3 flex items-center gap-1 border-t border-black/10 pt-3"><span className="mr-2 text-[11px] text-black/40">Rate</span>{[1,2,3,4,5].map((rating) => <button key={rating} onClick={() => void rateGeneration(item.id,rating)} aria-label={`Rate ${rating} out of 5`} className="text-lg text-amber-500">★</button>)}</div> : null}
+              </article>;
+            })}
+          </div>
         </section>
+
         {newToken ? (
           <section className="mb-6 rounded-[1.5rem] border border-[#5b42d5]/25 bg-[#d9d3ff] p-6">
             <p className="font-black">Copy this key now. It will not be shown again.</p>
@@ -342,6 +453,7 @@ export default function AccountPage() {
           </div>
           <div className="mt-6 rounded-2xl bg-[#171714] p-5 text-xs leading-6 text-white/65"><code>Authorization: Bearer wm_live_your_key</code><br /><code>https://wordmarks.net/mcp</code></div>
         </section>
+
         <section className="mt-6 rounded-[2rem] border border-red-200 bg-red-50 p-7">
           <p className="text-xs font-black uppercase tracking-[0.18em] text-red-700">Danger zone</p>
           <h2 className="mt-2 text-2xl font-black">Delete account</h2>

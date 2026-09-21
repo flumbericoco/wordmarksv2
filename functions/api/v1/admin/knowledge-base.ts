@@ -110,6 +110,23 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       if (id) {
         const row = await env.DB.prepare('SELECT * FROM knowledge_items WHERE id = ?').bind(id).first();
         if (!row) throw new NotFoundError('Item not found');
+        if (url.searchParams.get('image') === '1') {
+          const stored = String((row as Record<string, unknown>).image_data || '');
+          if (isR2Key(stored) && env.KB_BUCKET) {
+            const object = await env.KB_BUCKET.get(stored.slice(3));
+            if (!object) throw new NotFoundError('Image not found');
+            const headers = new Headers({ 'Cache-Control': 'private, max-age=3600', 'X-Content-Type-Options': 'nosniff' });
+            object.writeHttpMetadata(headers);
+            return new Response(object.body, { headers });
+          }
+          if (stored.startsWith('data:image/')) {
+            const comma = stored.indexOf(',');
+            const metadata = stored.slice(5, comma);
+            const binary = Uint8Array.from(atob(stored.slice(comma + 1)), (char) => char.charCodeAt(0));
+            return new Response(binary, { headers: { 'Content-Type': metadata.split(';')[0], 'Cache-Control': 'private, max-age=3600', 'X-Content-Type-Options': 'nosniff' } });
+          }
+          throw new NotFoundError('Image not found');
+        }
         return successResponse(redactItem(row as Record<string, unknown>, true), requestId);
       }
 

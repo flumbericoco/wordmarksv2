@@ -127,6 +127,7 @@ export function buildIdentityLogoPrompt(
   options?: { variationSeed?: string; improvementNotes?: string[]; research?: string },
 ): string {
   const layout = data.layout || 'icon-word';
+  const pureWordmark = layout.trim().toLowerCase() === 'wordmark';
   const notes = options?.improvementNotes?.length
     ? `\nREVIEW IMPROVEMENTS:\n- ${options.improvementNotes.join('\n- ')}`
     : '';
@@ -134,16 +135,17 @@ export function buildIdentityLogoPrompt(
 
 BRAND BRIEF: ${data.description || 'A modern brand that needs a distinctive, trustworthy identity.'}
 STYLE: ${data.style || 'modern, confident, timeless'}
+${pureWordmark ? `ABSOLUTE PURE WORDMARK MODE: Render only the exact name "${data.brandName}" as one contiguous custom typographic mark. Do not create an icon, symbol, emblem, monogram, badge, initial, pictogram, or detached graphic anywhere. Express the brand idea only inside the letterforms through custom cuts, counters, ligatures, terminals, spacing, and kerning.` : ''}
 COLOR DIRECTION: ${data.colorPreference || 'a restrained professional palette with one accent color'}
-COMPOSITION: ${layout}. Unless the user explicitly selected a pure wordmark, create a distinctive abstract symbol plus a custom wordmark. The symbol must have a clear idea derived from the brand name, initials, purpose, or motion—not a generic stock icon.
+COMPOSITION: ${layout}. This is a binding layout choice. "stacked" means a centered symbol above the brand name; "symbol-wordmark", "horizontal", or "icon-word" means symbol beside the brand name; "wordmark" means no detached symbol. If the value is only a recommendation rather than an explicit choice, select the strongest horizontal or vertical lockup from the brand category and dominant reference composition. The symbol must have a clear idea derived from the brand name, initials, purpose, or motion—not a generic stock icon.
 VARIATION KEY: ${options?.variationSeed || 'initial-concept'}
 ${options?.research ? `STRATEGIC CONTEXT: ${options.research.slice(0, 1800)}` : ''}${notes}
 
 ART DIRECTION:
-- Deliver a compact standalone symbol + wordmark lockup, never a poster, banner, mockup, or presentation board.
+- Deliver one compact production lockup in the selected composition, never a poster, banner, mockup, or presentation board.
 - Spell "${data.brandName}" exactly once and keep it immediately readable.
 - Build the symbol from simple geometric vector shapes with a memorable silhouette and meaningful negative space.
-- Use consistent optical weight, spacing, corner language, and alignment. Keep the symbol-to-wordmark gap near one letter-width and every part of the brand name tightly contiguous.
+- Use consistent optical weight, spacing, corner language, and alignment. In horizontal layouts keep the symbol gap near one letter-width; in stacked layouts use a compact, deliberate vertical gap and center both elements optically. Keep every part of the brand name tightly contiguous.
 - Maximum three flat colors. No backgrounds, frames, grids, taglines, slogans, metadata, tiny labels, glow, filters, patterns, mockups, photos, shadows, bevels, 3D, mascots, or decorative clutter.
 - Transparent artboard: do not draw a full-canvas background rectangle.
 - Make it work at favicon size and in monochrome.

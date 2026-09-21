@@ -6,8 +6,8 @@ import { getStats, runHealthChecks, type AdminHealth, type AdminStats } from '@/
 
 const quickLinks = [
   { href: '/admin/providers', number: '01', title: 'API Providers', copy: 'Manage models, endpoints, and provider access.', color: 'bg-[#c6ff4a]' },
-  { href: '/admin/knowledge-base', number: '02', title: 'Visual Library', copy: 'Curate references that guide every generation.', color: 'bg-[#d9d3ff]' },
-  { href: '/admin/settings', number: '03', title: 'Studio Settings', copy: 'Fine-tune quality, size, and iteration behavior.', color: 'bg-[#ffb7a6]' },
+  { href: '/admin/creator', number: '02', title: 'Logo Creator', copy: 'Manage instructions and knowledge files in one place.', color: 'bg-[#d9d3ff]' },
+  { href: '/admin/settings', number: '03', title: 'Studio Settings', copy: 'Control review and user-requested iteration behavior.', color: 'bg-[#ffb7a6]' },
 ];
 
 export default function AdminDashboard() {

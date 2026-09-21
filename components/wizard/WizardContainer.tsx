@@ -84,18 +84,18 @@ export default function WizardContainer({ onComplete }: WizardContainerProps) {
             <span className="absolute inset-0 flex items-center justify-center text-2xl">🧠</span>
           </div>
           <div className="text-center">
-            <h3 className="text-lg font-bold text-white">Researching {data.brandName}...</h3>
-            <p className="mt-1 text-sm text-zinc-400">Analyzing industry, competitors, and design trends</p>
+            <h3 className="text-lg font-bold text-white">Preparing {data.brandName}...</h3>
+            <p className="mt-1 text-sm text-zinc-400">Preparing the brief; Studio instructions and knowledge apply to final generation</p>
           </div>
           <div className="flex gap-2 text-xs text-zinc-600">
             <span className="animate-pulse">●</span>
-            <span>Industry analysis</span>
+            <span>Brand context</span>
             <span>·</span>
             <span className="animate-pulse" style={{ animationDelay: '0.3s' }}>●</span>
-            <span>Style matching</span>
+            <span>Style options</span>
             <span>·</span>
             <span className="animate-pulse" style={{ animationDelay: '0.6s' }}>●</span>
-            <span>Color psychology</span>
+            <span>Generation context</span>
           </div>
         </div>
       </div>

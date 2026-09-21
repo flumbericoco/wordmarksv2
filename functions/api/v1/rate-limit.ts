@@ -19,6 +19,10 @@ const RATE_LIMITS: Record<string, RateLimitConfig> = {
   'authenticated': { windowMs: 60_000, maxRequests: 30 },
   'generation': { windowMs: 3_600_000, maxRequests: 10 }, // 10 per hour
   'admin': { windowMs: 60_000, maxRequests: 300 },
+  // Login limits are applied only after invalid credentials. Successful users
+  // should never be locked out by previous attempts from the same network.
+  'login-identity': { windowMs: 10 * 60_000, maxRequests: 10 },
+  'login-ip': { windowMs: 10 * 60_000, maxRequests: 50 },
 };
 
 // ─── In-Memory Fallback (per-isolate, resets on cold start) ──
@@ -108,7 +112,7 @@ export async function checkRateLimit(
   identifier: string,
   action: string,
   env: { WORDMARKS_KV?: KVNamespace; DB?: D1Database },
-  tier?: 'unauthenticated' | 'authenticated' | 'generation' | 'admin',
+  tier?: 'unauthenticated' | 'authenticated' | 'generation' | 'admin' | 'login-identity' | 'login-ip',
 ): Promise<RateLimitResult> {
   // Determine tier
   const rateLimitTier = tier || 'authenticated';

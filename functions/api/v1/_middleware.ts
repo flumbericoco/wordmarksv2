@@ -109,7 +109,15 @@ export const onRequest = async (context: MiddlewareContext): Promise<Response> =
   // Stripe authenticates webhook requests with its signature in the handler;
   // IP-based middleware throttling could drop legitimate event bursts.
   const isStripeWebhook = isStripeWebhookPath;
-  const rlResult = isStripeWebhook
+  // Login failures are throttled inside the login handler using both IP and
+  // normalized email. Doing it here would also lock out valid credentials.
+  const requestPath = new URL(request.url).pathname;
+  const isUserLogin = requestPath === '/api/v1/account/login' && request.method === 'POST';
+  // This endpoint only validates the caller's HttpOnly session and returns
+  // their own profile. It is used as a navigation guard and must not turn a
+  // temporary 429 into a false logout after repeated page refreshes.
+  const isSessionCheck = requestPath === '/api/v1/account/me' && request.method === 'GET';
+  const rlResult = isStripeWebhook || isUserLogin || isSessionCheck
     ? { allowed: true, remaining: 1, limit: 1, resetAt: Date.now() + 60_000 }
     : await checkRateLimit(auth.actor, functionPath, env, tier);
 

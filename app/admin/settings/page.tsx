@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getSettings, updateSettings, exportData, type AdminSettings } from '@/lib/admin-api';
+import Link from 'next/link';
+import { getSettings, updateSettings, exportData, testPayPal, type AdminSettings } from '@/lib/admin-api';
 
 const DEFAULT_SETTINGS: AdminSettings = {
   systemPrompt: '',
@@ -12,6 +13,10 @@ const DEFAULT_SETTINGS: AdminSettings = {
   imageSize: '1024x1024',
   autoApprove: false,
   knowledgeBaseEnabled: true,
+  paypalClientId: '',
+  paypalClientSecret: '',
+  paypalMode: 'sandbox',
+  paypalWebhookId: '',
 };
 
 export default function SettingsPage() {
@@ -19,6 +24,8 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<{ connected: boolean; message?: string; error?: string } | null>(null);
+  const [testing, setTesting] = useState(false);
 
   useEffect(() => {
     getSettings()
@@ -30,11 +37,29 @@ export default function SettingsPage() {
   const handleSave = async () => {
     setError(null);
     try {
-      await updateSettings(settings);
+      const updated = await updateSettings(settings);
+      setSettings(updated);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save');
+    }
+  };
+
+  const handleTestPayPal = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await testPayPal({
+        clientId: settings.paypalClientId || undefined,
+        clientSecret: settings.paypalClientSecret || undefined,
+        mode: settings.paypalMode,
+      });
+      setTestResult(res);
+    } catch (e) {
+      setTestResult({ connected: false, error: e instanceof Error ? e.message : 'Test failed' });
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -65,7 +90,7 @@ export default function SettingsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Settings</h1>
-          <p className="mt-1 text-sm text-zinc-400">Configure default behavior and generation parameters</p>
+          <p className="mt-1 text-sm text-zinc-400">Configure default behavior, PayPal gateway, and generation parameters</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -84,46 +109,96 @@ export default function SettingsPage() {
       )}
 
       <div className="space-y-6">
-        <div className="rounded-xl border border-blue-500/25 bg-blue-500/[0.06] p-6 space-y-5">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-blue-400">Logo Creator Instructions</p>
-            <h3 className="mt-2 text-lg font-semibold text-white">Configure it like a Custom GPT</h3>
-            <p className="mt-1 text-xs leading-5 text-zinc-400">These private instructions are prepended to every logo request and are never shown to users.</p>
+        {/* PayPal Payment Gateway Settings */}
+        <div className="rounded-xl border border-white/10 bg-white/5 p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-white">PayPal Payment Gateway</h3>
+            <Link href="/admin/billing" className="text-xs text-blue-400 hover:underline">
+              Open Billing &amp; Reconciliation →
+            </Link>
           </div>
-          <div>
-            <label className="mb-2 block text-xs font-medium text-zinc-300">System prompt / Instructions</label>
-            <textarea
-              value={settings.systemPrompt}
-              onChange={(e) => setSettings({ ...settings, systemPrompt: e.target.value })}
-              rows={12}
-              maxLength={20000}
-              placeholder="Describe the role, design process, quality bar, and required output..."
-              className="w-full resize-y rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm leading-6 text-white outline-none focus:border-blue-500/60"
-            />
-            <p className="mt-1 text-right text-[11px] text-zinc-600">{settings.systemPrompt.length.toLocaleString()} / 20,000</p>
+          <p className="text-xs leading-5 text-zinc-400">
+            Set your PayPal API credentials so users can purchase credits and plans directly. No free trials are granted.
+          </p>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-400">PayPal Client ID</label>
+              <input
+                type="text"
+                value={settings.paypalClientId || ''}
+                onChange={(e) => setSettings({ ...settings, paypalClientId: e.target.value })}
+                placeholder="e.g. A21AA... or REST App Client ID"
+                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-blue-500/50"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-400">
+                PayPal Secret Key {settings.paypalClientSecretConfigured ? '✓ Configured' : ''}
+              </label>
+              <input
+                type="password"
+                value={settings.paypalClientSecret || ''}
+                onChange={(e) => setSettings({ ...settings, paypalClientSecret: e.target.value })}
+                placeholder={settings.paypalClientSecretConfigured ? (settings.paypalClientSecretMasked || '•••••••••••• (Leave blank to keep)') : 'Enter Client Secret'}
+                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-blue-500/50"
+              />
+            </div>
           </div>
-          <div>
-            <label className="mb-2 block text-xs font-medium text-zinc-300">Avoid / Negative instructions</label>
-            <textarea
-              value={settings.negativePrompt}
-              onChange={(e) => setSettings({ ...settings, negativePrompt: e.target.value })}
-              rows={4}
-              maxLength={5000}
-              placeholder="Generic icons, mockups, misspellings, extra text..."
-              className="w-full resize-y rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm leading-6 text-white outline-none focus:border-blue-500/60"
-            />
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-400">Environment</label>
+              <select
+                value={settings.paypalMode || 'sandbox'}
+                onChange={(e) => setSettings({ ...settings, paypalMode: e.target.value as 'sandbox' | 'live' })}
+                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-blue-500/50"
+              >
+                <option value="live">Live (Production Payments)</option>
+                <option value="sandbox">Sandbox (Testing)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-400">Webhook ID (Optional)</label>
+              <input
+                type="text"
+                value={settings.paypalWebhookId || ''}
+                onChange={(e) => setSettings({ ...settings, paypalWebhookId: e.target.value })}
+                placeholder="PayPal Webhook ID"
+                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-blue-500/50"
+              />
+            </div>
+          </div>
+
+          {testResult && (
+            <div className={`rounded-lg p-3 text-xs ${testResult.connected ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+              {testResult.connected ? `✓ ${testResult.message || 'Connected to PayPal!'}` : `✕ ${testResult.error}`}
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-1">
+            <button
+              type="button"
+              onClick={handleTestPayPal}
+              disabled={testing || (!settings.paypalClientId && !settings.paypalClientSecretConfigured)}
+              className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-zinc-300 hover:bg-white/5 transition-colors disabled:opacity-50"
+            >
+              {testing ? 'Testing...' : 'Test PayPal Connection'}
+            </button>
           </div>
         </div>
 
         {/* Image Generation */}
         <div className="rounded-xl border border-white/10 bg-white/5 p-6 space-y-4">
           <h3 className="text-sm font-semibold text-white">Image Generation</h3>
-          <p className="text-xs leading-5 text-zinc-500">Quality and size apply only when an image-model provider returns raster artwork. SVG wordmarks are vector output and ignore these two settings.</p>
+          <p className="text-xs leading-5 text-zinc-500">GPT Image 2.5 currently runs at maximum quality and a landscape production canvas. These values document the fallback behavior for other providers.</p>
 
           <div className="grid grid-cols-2 gap-4">
-            <div>
+            <div className="opacity-60">
               <label className="mb-1 block text-xs font-medium text-zinc-400">Quality</label>
-              <select
+              <select disabled
                 value={settings.imageQuality}
                 onChange={(e) => setSettings({ ...settings, imageQuality: e.target.value as 'standard' | 'hd' })}
                 className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-blue-500/50"
@@ -133,9 +208,9 @@ export default function SettingsPage() {
               </select>
             </div>
 
-            <div>
+            <div className="opacity-60">
               <label className="mb-1 block text-xs font-medium text-zinc-400">Size</label>
-              <select
+              <select disabled
                 value={settings.imageSize}
                 onChange={(e) => setSettings({ ...settings, imageSize: e.target.value as AdminSettings['imageSize'] })}
                 className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-blue-500/50"
@@ -157,7 +232,7 @@ export default function SettingsPage() {
               onChange={(e) => setSettings({ ...settings, maxIterations: parseInt(e.target.value) || 3 })}
               className="w-32 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-blue-500/50"
             />
-            <p className="mt-1 text-xs text-zinc-600">Maximum automatic review iterations when auto-review is enabled. Manual user revisions remain separate.</p>
+            <p className="mt-1 text-xs text-zinc-600">Maximum user-requested improvement rounds retained for one logo workflow.</p>
           </div>
         </div>
 

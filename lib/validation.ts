@@ -251,6 +251,10 @@ export interface SettingsRequest {
   imageSize?: '1024x1024' | '1792x1024' | '1024x1792';
   autoApprove?: boolean;
   knowledgeBaseEnabled?: boolean;
+  paypalClientId?: string;
+  paypalClientSecret?: string;
+  paypalMode?: 'sandbox' | 'live';
+  paypalWebhookId?: string;
 }
 
 export function validateSettingsRequest(body: unknown): ValidationResult<SettingsRequest> {

@@ -1,13 +1,20 @@
 import { authenticateRequest } from '../auth';
 import { UnauthorizedError, errorResponse, successResponse } from '../../../lib/errors';
+import { getPayPalConfig, getPayPalApiBase } from '../../../lib/paypal';
 
 interface Env {
   DB: D1Database;
   ADMIN_PASSWORD?: string;
   WORDMARKS_MCP_TOKEN?: string;
   OPENAI_API_KEY?: string;
+  OPENAI_IMAGE_API_KEY?: string;
   STRIPE_SECRET_KEY?: string;
   RESEND_API_KEY?: string;
+  KB_BUCKET?: R2Bucket;
+  GENERATED_BUCKET?: R2Bucket;
+  PAYPAL_CLIENT_ID?: string;
+  PAYPAL_CLIENT_SECRET?: string;
+  PAYPAL_MODE?: string;
 }
 
 type Check = { status: 'up' | 'down' | 'missing'; latencyMs?: number; detail?: string };
@@ -40,13 +47,32 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     database = { status: 'down', latencyMs: Date.now() - dbStarted, detail: error instanceof Error ? error.message : 'Database failed' };
   }
 
-  const ai: Check = env.OPENAI_API_KEY
-    ? await timed(() => fetch('https://api.pesatrouter.com/v1/chat/completions', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'pesat-pro', messages: [{ role: 'user', content: 'Reply OK' }], max_tokens: 2 }),
+  const openAiKey = env.OPENAI_IMAGE_API_KEY || env.OPENAI_API_KEY;
+  const ai: Check = openAiKey
+    ? await timed(() => fetch('https://api.openai.com/v1/models', {
+        headers: { Authorization: `Bearer ${openAiKey}` },
       }))
-    : { status: 'missing', detail: 'OPENAI_API_KEY is not configured' };
+    : { status: 'missing', detail: 'OPENAI_IMAGE_API_KEY is not configured' };
+
+  const paypalConfig = await getPayPalConfig(env.DB, env);
+  let paypal: Check;
+  if (paypalConfig.configured) {
+    const base = getPayPalApiBase(paypalConfig.mode);
+    const credentials = btoa(`${paypalConfig.clientId}:${paypalConfig.clientSecret}`);
+    paypal = await timed(() => fetch(`${base}/v1/oauth2/token`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${credentials}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: 'grant_type=client_credentials',
+    }));
+    if (paypal.status === 'up') {
+      paypal.detail = `${paypalConfig.mode.toUpperCase()} connected`;
+    }
+  } else {
+    paypal = { status: 'missing', detail: 'PayPal credentials not configured' };
+  }
 
   const stripe: Check = env.STRIPE_SECRET_KEY
     ? await timed(() => fetch('https://api.stripe.com/v1/balance', { headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY}` } }))
@@ -56,5 +82,11 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     ? await timed(() => fetch('https://api.resend.com/domains', { headers: { Authorization: `Bearer ${env.RESEND_API_KEY}` } }))
     : { status: 'missing', detail: 'RESEND_API_KEY is not configured' };
 
-  return successResponse({ checkedAt: new Date().toISOString(), checks: { database, ai, stripe, email } }, requestId);
+  const knowledgeStorage: Check = env.KB_BUCKET ? { status: 'up' } : { status: 'missing', detail: 'KB_BUCKET is not bound' };
+  const generatedStorage: Check = env.GENERATED_BUCKET ? { status: 'up' } : { status: 'missing', detail: 'GENERATED_BUCKET is not bound' };
+
+  return successResponse({
+    checkedAt: new Date().toISOString(),
+    checks: { database, ai, paypal, knowledgeStorage, generatedStorage, stripe, email }
+  }, requestId);
 };
