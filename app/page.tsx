@@ -32,33 +32,22 @@ const pricingPlans = [
 export interface ShowcaseLogoItem {
   id: string;
   name: string;
-  category: 'luxury' | 'lifestyle' | 'botanical' | 'tech';
+  category: 'tech' | 'cloud' | 'luxury' | 'design';
   tag: string;
   style: string;
   imageSrc: string;
-  isSvg?: boolean;
 }
 
 const showcaseLogos: ShowcaseLogoItem[] = [
-  { id: 'flow', name: 'FLOW', category: 'botanical', tag: 'Floral Artistry', style: 'Couture Monogram & Serif', imageSrc: '/showcase/flow.png' },
-  { id: 'nivelle', name: 'nivelle', category: 'luxury', tag: 'High-End Beauty', style: 'Parisian Editorial Serif', imageSrc: '/showcase/nivelle.png' },
-  { id: 'camila-coffee', name: 'CAMILA', category: 'lifestyle', tag: 'Artisan Coffee Atelier', style: 'Warm Flourish Display', imageSrc: '/showcase/camila-coffee.png' },
-  { id: 'camila-ocean', name: 'CAMILA', category: 'luxury', tag: 'Ocean Wave Luxury', style: 'High-Contrast Swash Serif', imageSrc: '/showcase/camila-ocean.png' },
-  { id: 'ayla', name: 'AYLA', category: 'botanical', tag: 'Forest Botanical', style: 'Organic Ligature Arch', imageSrc: '/showcase/ayla.png' },
-  { id: 'roma', name: 'ROMA', category: 'luxury', tag: 'Classical Heritage', style: 'Italian Colosseum Antiqua', imageSrc: '/showcase/roma.png' },
-  { id: 'we-ride', name: 'WE RIDE TOGETHER', category: 'lifestyle', tag: 'Bespoke Crest Club', style: 'Precision Monogram Emblem', imageSrc: '/showcase/we-ride-together.jpg' },
-  { id: 'dubai', name: 'DUBAI', category: 'luxury', tag: 'Skyline Luxury', style: 'Architectural Crescent Serif', imageSrc: '/showcase/dubai.png' },
-  { id: 'navi', name: 'Navi', category: 'tech', tag: 'Celestial Modern', style: 'Fluid Humanist Wordmark', imageSrc: '/showcase/navi.png' },
-  { id: 'tolina', name: 'Tolina', category: 'lifestyle', tag: 'Espresso Lounge', style: 'Warm Arch & Star Serif', imageSrc: '/showcase/tolina.png' },
-  { id: 'an-nahl', name: 'an-nahl', category: 'tech', tag: 'Technology & Inclusion', style: 'Pure Vector Tech SVG', imageSrc: '/showcase/an-nahl.svg', isSvg: true },
-  { id: 'arganails-spa', name: 'ARGANAILS SPA', category: 'luxury', tag: 'Luxury Wellness Suite', style: 'Gold Geometric Emblem', imageSrc: '/showcase/arganails-spa.webp' },
-  { id: 'arganails-card', name: 'ARGANAILS', category: 'luxury', tag: 'Stationery Identity', style: 'Minimal Luxury Monogram', imageSrc: '/showcase/arganails-card.webp' },
-  { id: 'argan-bag', name: 'ARGANAILS', category: 'luxury', tag: 'Retail Bag Identity', style: 'Bespoke Moroccan Geometry', imageSrc: '/showcase/argan-bag.webp' },
-  { id: 'argan-candle', name: 'FEEL RELAX', category: 'lifestyle', tag: 'Aromatherapy Suite', style: 'Botanical Artisan Serif', imageSrc: '/showcase/argan-candle.webp' },
-  { id: 'argan-soap', name: 'ARGAN SOAP BAR', category: 'botanical', tag: 'Organic Body Care', style: 'Modern Apothecary', imageSrc: '/showcase/argan-soap.webp' },
-  { id: 'argan-cream', name: 'ARGAN OIL', category: 'botanical', tag: 'Hand & Face Cream', style: 'Minimal Tube Wordmark', imageSrc: '/showcase/argan-cream.webp' },
-  { id: 'argan-oil', name: 'ARGAN OIL', category: 'botanical', tag: 'Botanical Dropper', style: 'Pure Luxury Dropper', imageSrc: '/showcase/argan-oil.webp' },
-  { id: 'argan-guidelines', name: 'ARGANAILS SPEC', category: 'tech', tag: 'Brand Identity Sheet', style: 'System Design Guidelines', imageSrc: '/showcase/argan-guidelines.webp' },
+  { id: 'apexlab', name: 'ApexLab', category: 'tech', tag: 'Biotech & AI Research', style: 'Precision Geometric Tech', imageSrc: '/showcase/apexlab.png' },
+  { id: 'sentrio', name: 'Sentrio', category: 'tech', tag: 'Intelligent Automation Cloud', style: 'Dynamic Streamline Sans', imageSrc: '/showcase/sentrio.png' },
+  { id: 'arclume', name: 'Arclume', category: 'design', tag: 'Architecture & Spatial Light', style: 'Architectural Apex Monogram', imageSrc: '/showcase/arclume.png' },
+  { id: 'gridora', name: 'Gridora', category: 'cloud', tag: 'Distributed Compute Mesh', style: 'Isometric Hexagon Emblem', imageSrc: '/showcase/gridora.png' },
+  { id: 'velisse', name: 'Velisse', category: 'luxury', tag: 'Haute Couture & Skincare', style: 'Botanical Leaf Serif', imageSrc: '/showcase/velisse.png' },
+  { id: 'nodera', name: 'Nodera', category: 'tech', tag: 'Data Systems & Knowledge Engine', style: 'Folded Prism Monogram', imageSrc: '/showcase/nodera.png' },
+  { id: 'arvena', name: 'ARVENA', category: 'tech', tag: 'Aerospace & Precision Systems', style: 'Minimal Apex Chevron', imageSrc: '/showcase/arvena.png' },
+  { id: 'pesat', name: 'Pesat.ai', category: 'cloud', tag: 'Enterprise AI & Agent Platform', style: 'Bold Tech Loop Emblem', imageSrc: '/showcase/pesat.png' },
+  { id: 'presto', name: 'Presto', category: 'cloud', tag: 'High-Velocity Logistics', style: 'Kinetic Vortex Pinwheel', imageSrc: '/showcase/presto.png' },
 ];
 
 async function makeReviewPreview(imageUrl: string): Promise<string> {
@@ -98,8 +87,7 @@ export default function Home() {
   const [maxIterations, setMaxIterations] = useState(3);
   const [autoReview, setAutoReview] = useState(false);
   const [byokStatus, setByokStatus] = useState<{ currentPrice: number; tier: number; slotsRemaining: number; nextPrice: number } | null>(null);
-  const [galleryFilter, setGalleryFilter] = useState<'all' | 'luxury' | 'lifestyle' | 'botanical' | 'tech'>('all');
-  const [dynamicLogos, setDynamicLogos] = useState<ShowcaseLogoItem[]>([]);
+  const [galleryFilter, setGalleryFilter] = useState<'all' | 'tech' | 'cloud' | 'luxury' | 'design'>('all');
   const [lightboxLogo, setLightboxLogo] = useState<ShowcaseLogoItem | null>(null);
   const bestCandidate = useRef<{ logo: LogoResult; review: QualityScore } | null>(null);
 
@@ -141,24 +129,7 @@ export default function Home() {
           }
         })
         .catch(() => undefined);
-      void fetch('/api/v1/showcase')
-        .then(async (response) => response.ok ? response.json() as Promise<{ ok?: boolean; generations?: Array<{ id: string; brandName: string; imageUrl: string; qualityScore?: number }> }> : null)
-        .then((payload) => {
-          if (payload?.ok && Array.isArray(payload.generations) && payload.generations.length > 0) {
-            const mapped: ShowcaseLogoItem[] = payload.generations.map((g) => ({
-              id: `dyn-${g.id}`,
-              name: g.brandName,
-              category: 'tech' as const,
-              tag: 'Recent Studio Generation',
-              style: 'AI Vector Mark',
-              imageSrc: g.imageUrl,
-            }));
-            setDynamicLogos(mapped);
-          }
-        })
-        .catch(() => undefined);
     }, 0);
-    return () => window.clearTimeout(timer);
   }, []);
 
   const rememberResult = (
@@ -578,30 +549,30 @@ export default function Home() {
               </div>
             </section>
 
-            {/* Real Studio Generated Logos Showcase Gallery */}
+            {/* 9 GPT-Generated Studio Production Logos */}
             <section id="showcase" data-reveal className="reveal-section bg-[#10100e] px-5 py-20 text-white sm:px-8 lg:py-28">
               <div className="mx-auto max-w-7xl">
                 <div className="flex flex-col gap-6 border-b border-white/10 pb-10 lg:flex-row lg:items-end lg:justify-between">
                   <div>
                     <div className="inline-flex items-center gap-2 rounded-full border border-[#c6ff4a]/30 bg-[#c6ff4a]/10 px-3.5 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-[#c6ff4a]">
-                      <span>✦</span> Wordmarks Studio Production Marks
+                      <span>✦</span> 9 Production Showcase Marks
                     </div>
                     <h2 className="mt-4 max-w-2xl text-4xl font-black leading-[0.92] tracking-[-0.065em] sm:text-6xl">
                       Real marks generated by our studio.
                     </h2>
                     <p className="mt-4 max-w-xl text-sm leading-6 text-white/55">
-                      Explore real logos produced by our AI identity engine—from bespoke serifs and luxury apothecary seals to precision tech marks.
+                      Explore the real identity marks generated using our newest GPT model—from bespoke tech emblems and enterprise AI systems to luxury beauty.
                     </p>
                   </div>
 
                   {/* Filter Pills */}
                   <div className="flex flex-wrap gap-2 text-xs font-bold">
                     {[
-                      { key: 'all', label: `All Logos (${dynamicLogos.length + showcaseLogos.length})` },
-                      { key: 'luxury', label: 'Luxury & Couture' },
-                      { key: 'lifestyle', label: 'Lifestyle & Dining' },
-                      { key: 'botanical', label: 'Botanical & Organic' },
-                      { key: 'tech', label: 'Tech & Identity' },
+                      { key: 'all', label: 'All 9 Logos' },
+                      { key: 'tech', label: 'AI & Engineering' },
+                      { key: 'cloud', label: 'Cloud & Agents' },
+                      { key: 'luxury', label: 'Luxury & Beauty' },
+                      { key: 'design', label: 'Spatial & Design' },
                     ].map((tab) => (
                       <button
                         key={tab.key}
@@ -619,9 +590,9 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Grid of Real Generated Logos */}
-                <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                  {[...dynamicLogos, ...showcaseLogos]
+                {/* Grid of 9 Real Generated Logos */}
+                <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                  {showcaseLogos
                     .filter((item) => galleryFilter === 'all' || item.category === galleryFilter)
                     .map((item) => (
                       <div
@@ -630,47 +601,45 @@ export default function Home() {
                       >
                         {/* Real Image container with click-to-preview */}
                         <div
-                          className="relative aspect-[4/3] w-full overflow-hidden bg-black/60 cursor-pointer"
+                          className="relative aspect-square w-full overflow-hidden bg-white p-6 flex items-center justify-center cursor-pointer"
                           onClick={() => setLightboxLogo(item)}
                         >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={item.imageSrc}
                             alt={`${item.name} logo`}
-                            className={`h-full w-full transition-transform duration-500 group-hover:scale-105 ${
-                              item.isSvg ? 'object-contain p-6 bg-[#09090b]' : 'object-cover'
-                            }`}
+                            className="max-h-40 w-auto object-contain transition-transform duration-500 group-hover:scale-110"
                             loading="lazy"
                           />
                           {/* Badges */}
                           <div className="absolute inset-x-3 top-3 flex items-center justify-between pointer-events-none">
-                            <span className="rounded-full border border-white/15 bg-black/70 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-white backdrop-blur-md">
+                            <span className="rounded-full border border-black/10 bg-black/70 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-white backdrop-blur-md">
                               {item.category}
                             </span>
-                            <span className="rounded-full border border-[#c6ff4a]/30 bg-black/70 px-2.5 py-0.5 text-[9px] font-mono font-bold text-[#c6ff4a] backdrop-blur-md">
-                              Studio Mark
+                            <span className="rounded-full border border-[#c6ff4a]/40 bg-[#171714]/80 px-2.5 py-0.5 text-[9px] font-mono font-bold text-[#c6ff4a] backdrop-blur-md">
+                              GPT Model
                             </span>
                           </div>
                           {/* Hover inspection overlay */}
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 flex items-end p-3.5">
-                            <span className="text-[11px] font-bold text-white flex items-center gap-1.5 drop-shadow">
-                              <span>🔍</span> Click to inspect full mark
+                          <div className="absolute inset-0 bg-black/10 opacity-0 transition-opacity duration-300 group-hover:opacity-100 flex items-end p-3.5">
+                            <span className="text-[11px] font-bold text-[#171714] bg-white/90 px-3 py-1 rounded-full shadow-md flex items-center gap-1.5">
+                              <span>🔍</span> Click to inspect
                             </span>
                           </div>
                         </div>
 
                         {/* Card metadata & Studio action */}
-                        <div className="flex flex-1 flex-col justify-between p-4 bg-[#141412]">
+                        <div className="flex flex-1 flex-col justify-between p-5 bg-[#141412]">
                           <div>
                             <div className="flex items-baseline justify-between gap-2">
-                              <h3 className="text-base font-black tracking-tight text-white">{item.name}</h3>
+                              <h3 className="text-lg font-black tracking-tight text-white">{item.name}</h3>
                               <span className="text-[10px] font-mono text-white/40">{item.style}</span>
                             </div>
                             <p className="mt-1 text-xs text-white/60">{item.tag}</p>
                           </div>
 
-                          <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-3 text-[11px]">
-                            <span className="text-white/40 font-mono text-[10px]">Vector SVG + PNG</span>
+                          <div className="mt-5 flex items-center justify-between border-t border-white/10 pt-3 text-[11px]">
+                            <span className="text-white/40 font-mono text-[10px]">Production PNG + SVG</span>
                             <a
                               href="#create"
                               className="font-bold text-[#c6ff4a] opacity-90 transition-opacity hover:opacity-100 hover:underline flex items-center gap-1"
