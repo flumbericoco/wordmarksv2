@@ -6,14 +6,20 @@ interface Env {
 }
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env, params }) => {
-  const user = await getUserSession(request, env.DB);
-  if (!user) return Response.json({ error: 'Authentication required' }, { status: 401 });
   if (!env.GENERATED_BUCKET) return Response.json({ error: 'Logo storage is unavailable' }, { status: 503 });
 
   const id = String((params as { id?: string }).id || '');
-  const job = await env.DB.prepare(
-    "SELECT brand_name,r2_key FROM generation_jobs WHERE id=? AND user_id=? AND status='completed'"
-  ).bind(id, user.id).first<{ brand_name: string; r2_key: string | null }>();
+  const user = await getUserSession(request, env.DB);
+
+  // If user is authenticated, query their own job; otherwise allow public viewing of completed jobs
+  const job = user
+    ? await env.DB.prepare(
+        "SELECT brand_name,r2_key FROM generation_jobs WHERE id=? AND user_id=? AND status='completed'"
+      ).bind(id, user.id).first<{ brand_name: string; r2_key: string | null }>()
+    : await env.DB.prepare(
+        "SELECT brand_name,r2_key FROM generation_jobs WHERE id=? AND status='completed'"
+      ).bind(id).first<{ brand_name: string; r2_key: string | null }>();
+
   if (!job?.r2_key) return Response.json({ error: 'Logo not found' }, { status: 404 });
 
   const object = await env.GENERATED_BUCKET.get(job.r2_key);

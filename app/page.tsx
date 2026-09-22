@@ -32,41 +32,33 @@ const pricingPlans = [
 export interface ShowcaseLogoItem {
   id: string;
   name: string;
-  category: 'tech' | 'luxury' | 'minimalist' | 'lifestyle' | 'fintech';
+  category: 'luxury' | 'lifestyle' | 'botanical' | 'tech';
   tag: string;
   style: string;
-  bgClass: string;
-  textClass: string;
-  subClass: string;
-  symbol?: string;
-  fontClass: string;
+  imageSrc: string;
+  isSvg?: boolean;
 }
 
 const showcaseLogos: ShowcaseLogoItem[] = [
-  { id: 'kinetic', name: 'KINETIC', category: 'tech', tag: 'AI Motion Systems', style: 'Grotesque Italic', bgClass: 'bg-[#0f172a]', textClass: 'text-white', subClass: 'text-[#38bdf8]', symbol: '✦', fontClass: 'font-black italic tracking-[-0.07em]' },
-  { id: 'aurelia', name: 'AURELIA', category: 'luxury', tag: 'Haute Horlogerie', style: 'Roman Serif', bgClass: 'bg-[#181512]', textClass: 'text-[#f5f0e6]', subClass: 'text-[#d4af37]', symbol: '◈', fontClass: 'font-serif tracking-[0.24em]' },
-  { id: 'kanso', name: 'kanso', category: 'minimalist', tag: 'Spatial Architecture', style: 'Organic Humanist', bgClass: 'bg-[#f4f1ea]', textClass: 'text-[#171714]', subClass: 'text-[#7c3aed]', symbol: '—', fontClass: 'font-serif italic tracking-tight' },
-  { id: 'vault', name: 'VAULT', category: 'fintech', tag: 'Institutional Custody', style: 'Monolithic Heavy', bgClass: 'bg-[#09090b]', textClass: 'text-white', subClass: 'text-[#22c55e]', symbol: '■', fontClass: 'font-black tracking-[-0.05em]' },
-  { id: 'roast', name: 'ROAST & CO', category: 'lifestyle', tag: 'Specialty Roastery', style: 'Artisanal Slab', bgClass: 'bg-[#231815]', textClass: 'text-[#fdf0ed]', subClass: 'text-[#e07a5f]', symbol: '☕', fontClass: 'font-serif font-bold tracking-[0.06em]' },
-  { id: 'synapse', name: 'SYNAPSE', category: 'tech', tag: 'Neural Compute', style: 'Futuristic Monospace', bgClass: 'bg-[#030712]', textClass: 'text-[#e2e8f0]', subClass: 'text-[#06b6d4]', symbol: '::', fontClass: 'font-mono font-bold tracking-[0.22em]' },
-  { id: 'maison-v', name: 'MAISON V', category: 'luxury', tag: 'Parisian Couture', style: 'Refined Hairline', bgClass: 'bg-[#121212]', textClass: 'text-white', subClass: 'text-white/50', symbol: '·', fontClass: 'font-serif font-light tracking-[0.28em]' },
-  { id: 'forme', name: 'forme.', category: 'minimalist', tag: 'Industrial Design', style: 'Swiss Neo-Grotesk', bgClass: 'bg-[#ffffff]', textClass: 'text-black', subClass: 'text-[#ff5c35]', symbol: '•', fontClass: 'font-black tracking-[-0.04em]' },
-  { id: 'meridian', name: 'MERIDIAN', category: 'fintech', tag: 'Global Liquidity', style: 'Corporate Modern', bgClass: 'bg-[#0b1329]', textClass: 'text-white', subClass: 'text-[#3b82f6]', symbol: '/', fontClass: 'font-black tracking-[0.06em]' },
-  { id: 'ember', name: 'ember', category: 'lifestyle', tag: 'Artisan Hearth', style: 'Warm Humanist', bgClass: 'bg-[#1f1412]', textClass: 'text-[#ffedd5]', subClass: 'text-[#f97316]', symbol: '✳', fontClass: 'font-serif font-bold italic' },
-  { id: 'neura', name: 'NEURA', category: 'tech', tag: 'Autonomous AI', style: 'Precision Tech Sans', bgClass: 'bg-[#0a0a0c]', textClass: 'text-white', subClass: 'text-[#a855f7]', symbol: '▲', fontClass: 'font-black tracking-[-0.06em]' },
-  { id: 'noir', name: 'NOIR & CO.', category: 'luxury', tag: 'Fine Leathercraft', style: 'Obsidian Serif', bgClass: 'bg-[#0d0d0d]', textClass: 'text-white', subClass: 'text-white/60', symbol: '✦', fontClass: 'font-serif font-black tracking-[0.16em]' },
-  { id: 'studio9', name: 'STUDIO 09', category: 'minimalist', tag: 'Creative Direction', style: 'Bauhaus Grid', bgClass: 'bg-[#f8f9fa]', textClass: 'text-black', subClass: 'text-[#16a34a]', symbol: '09', fontClass: 'font-black tracking-[-0.05em]' },
-  { id: 'apex', name: 'APEX', category: 'fintech', tag: 'Quantitative Wealth', style: 'Kinetic Chevron', bgClass: 'bg-[#0f172a]', textClass: 'text-white', subClass: 'text-[#10b981]', symbol: '▲', fontClass: 'font-black tracking-[0.05em]' },
-  { id: 'botanica', name: 'BOTANICA', category: 'lifestyle', tag: 'Botanical Skincare', style: 'Flourish Editorial', bgClass: 'bg-[#1c2826]', textClass: 'text-[#dad7cd]', subClass: 'text-[#a3b18a]', symbol: '🌿', fontClass: 'font-serif tracking-[0.2em]' },
-  { id: 'orbit', name: 'ORBIT', category: 'tech', tag: 'Observability Cloud', style: 'Astronav Mono', bgClass: 'bg-[#0b0f19]', textClass: 'text-white', subClass: 'text-[#818cf8]', symbol: '◎', fontClass: 'font-mono font-bold tracking-[0.16em]' },
-  { id: 'velour', name: 'VELOUR', category: 'luxury', tag: 'Cashmere Atelier', style: 'Condensed Editorial', bgClass: 'bg-[#1c1618]', textClass: 'text-white', subClass: 'text-[#e2b4bd]', symbol: '✧', fontClass: 'font-serif font-bold tracking-[0.18em]' },
-  { id: 'arch', name: 'ARCH', category: 'minimalist', tag: 'Object Design', style: 'Extended Baseline', bgClass: 'bg-[#f1ede4]', textClass: 'text-[#1c1b18]', subClass: 'text-[#d97706]', symbol: '∏', fontClass: 'font-black tracking-[0.26em]' },
-  { id: 'ledger', name: 'LEDGER', category: 'fintech', tag: 'Audit Protocol', style: 'Block Heavy Sans', bgClass: 'bg-[#0f141c]', textClass: 'text-white', subClass: 'text-[#34d399]', symbol: '✓', fontClass: 'font-black tracking-[-0.03em]' },
-  { id: 'fable', name: 'fable.', category: 'lifestyle', tag: 'Heirloom Stories', style: 'Playful Rounded', bgClass: 'bg-[#fff8f0]', textClass: 'text-[#7f4f24]', subClass: 'text-[#b08968]', symbol: '★', fontClass: 'font-serif font-black tracking-tight' },
-  { id: 'voxel', name: 'VOXEL', category: 'tech', tag: 'Spatial 3D Engine', style: 'Isometric Display', bgClass: 'bg-[#130e20]', textClass: 'text-[#f3e8ff]', subClass: 'text-[#c084fc]', symbol: '❖', fontClass: 'font-mono font-black tracking-[0.1em]' },
-  { id: 'solene', name: 'Solène', category: 'luxury', tag: 'Fine Parfumerie', style: 'Parisienne Italic', bgClass: 'bg-[#171412]', textClass: 'text-white', subClass: 'text-[#eed5b7]', symbol: '✽', fontClass: 'font-serif font-light italic tracking-[0.16em]' },
-  { id: 'mono', name: 'MONO', category: 'minimalist', tag: 'Independent Press', style: 'Brutalist Monospace', bgClass: 'bg-[#000000]', textClass: 'text-white', subClass: 'text-white/60', symbol: '[]', fontClass: 'font-mono font-black tracking-[0.3em]' },
-  { id: 'pulse', name: 'PULSE', category: 'fintech', tag: 'High-Frequency Trading', style: 'Dynamic Italic', bgClass: 'bg-[#0a0f1d]', textClass: 'text-white', subClass: 'text-[#38bdf8]', symbol: '⚡', fontClass: 'font-black italic tracking-[-0.06em]' },
+  { id: 'flow', name: 'FLOW', category: 'botanical', tag: 'Floral Artistry', style: 'Couture Monogram & Serif', imageSrc: '/showcase/flow.png' },
+  { id: 'nivelle', name: 'nivelle', category: 'luxury', tag: 'High-End Beauty', style: 'Parisian Editorial Serif', imageSrc: '/showcase/nivelle.png' },
+  { id: 'camila-coffee', name: 'CAMILA', category: 'lifestyle', tag: 'Artisan Coffee Atelier', style: 'Warm Flourish Display', imageSrc: '/showcase/camila-coffee.png' },
+  { id: 'camila-ocean', name: 'CAMILA', category: 'luxury', tag: 'Ocean Wave Luxury', style: 'High-Contrast Swash Serif', imageSrc: '/showcase/camila-ocean.png' },
+  { id: 'ayla', name: 'AYLA', category: 'botanical', tag: 'Forest Botanical', style: 'Organic Ligature Arch', imageSrc: '/showcase/ayla.png' },
+  { id: 'roma', name: 'ROMA', category: 'luxury', tag: 'Classical Heritage', style: 'Italian Colosseum Antiqua', imageSrc: '/showcase/roma.png' },
+  { id: 'we-ride', name: 'WE RIDE TOGETHER', category: 'lifestyle', tag: 'Bespoke Crest Club', style: 'Precision Monogram Emblem', imageSrc: '/showcase/we-ride-together.jpg' },
+  { id: 'dubai', name: 'DUBAI', category: 'luxury', tag: 'Skyline Luxury', style: 'Architectural Crescent Serif', imageSrc: '/showcase/dubai.png' },
+  { id: 'navi', name: 'Navi', category: 'tech', tag: 'Celestial Modern', style: 'Fluid Humanist Wordmark', imageSrc: '/showcase/navi.png' },
+  { id: 'tolina', name: 'Tolina', category: 'lifestyle', tag: 'Espresso Lounge', style: 'Warm Arch & Star Serif', imageSrc: '/showcase/tolina.png' },
+  { id: 'an-nahl', name: 'an-nahl', category: 'tech', tag: 'Technology & Inclusion', style: 'Pure Vector Tech SVG', imageSrc: '/showcase/an-nahl.svg', isSvg: true },
+  { id: 'arganails-spa', name: 'ARGANAILS SPA', category: 'luxury', tag: 'Luxury Wellness Suite', style: 'Gold Geometric Emblem', imageSrc: '/showcase/arganails-spa.webp' },
+  { id: 'arganails-card', name: 'ARGANAILS', category: 'luxury', tag: 'Stationery Identity', style: 'Minimal Luxury Monogram', imageSrc: '/showcase/arganails-card.webp' },
+  { id: 'argan-bag', name: 'ARGANAILS', category: 'luxury', tag: 'Retail Bag Identity', style: 'Bespoke Moroccan Geometry', imageSrc: '/showcase/argan-bag.webp' },
+  { id: 'argan-candle', name: 'FEEL RELAX', category: 'lifestyle', tag: 'Aromatherapy Suite', style: 'Botanical Artisan Serif', imageSrc: '/showcase/argan-candle.webp' },
+  { id: 'argan-soap', name: 'ARGAN SOAP BAR', category: 'botanical', tag: 'Organic Body Care', style: 'Modern Apothecary', imageSrc: '/showcase/argan-soap.webp' },
+  { id: 'argan-cream', name: 'ARGAN OIL', category: 'botanical', tag: 'Hand & Face Cream', style: 'Minimal Tube Wordmark', imageSrc: '/showcase/argan-cream.webp' },
+  { id: 'argan-oil', name: 'ARGAN OIL', category: 'botanical', tag: 'Botanical Dropper', style: 'Pure Luxury Dropper', imageSrc: '/showcase/argan-oil.webp' },
+  { id: 'argan-guidelines', name: 'ARGANAILS SPEC', category: 'tech', tag: 'Brand Identity Sheet', style: 'System Design Guidelines', imageSrc: '/showcase/argan-guidelines.webp' },
 ];
 
 async function makeReviewPreview(imageUrl: string): Promise<string> {
@@ -106,7 +98,9 @@ export default function Home() {
   const [maxIterations, setMaxIterations] = useState(3);
   const [autoReview, setAutoReview] = useState(false);
   const [byokStatus, setByokStatus] = useState<{ currentPrice: number; tier: number; slotsRemaining: number; nextPrice: number } | null>(null);
-  const [galleryFilter, setGalleryFilter] = useState<'all' | 'tech' | 'luxury' | 'minimalist' | 'lifestyle' | 'fintech'>('all');
+  const [galleryFilter, setGalleryFilter] = useState<'all' | 'luxury' | 'lifestyle' | 'botanical' | 'tech'>('all');
+  const [dynamicLogos, setDynamicLogos] = useState<ShowcaseLogoItem[]>([]);
+  const [lightboxLogo, setLightboxLogo] = useState<ShowcaseLogoItem | null>(null);
   const bestCandidate = useRef<{ logo: LogoResult; review: QualityScore } | null>(null);
 
   const applyQualityReview = (candidate: LogoResult, review: QualityScore) => {
@@ -141,9 +135,25 @@ export default function Home() {
             setByokStatus({
               currentPrice: payload.currentPrice,
               tier: payload.tier || 1,
-              slotsRemaining: payload.slotsRemaining || 5,
-              nextPrice: payload.nextPrice || (payload.currentPrice + 10),
+              slotsRemaining: payload.slotsRemaining ?? 5,
+              nextPrice: payload.nextPrice || 29,
             });
+          }
+        })
+        .catch(() => undefined);
+      void fetch('/api/v1/showcase')
+        .then(async (response) => response.ok ? response.json() as Promise<{ ok?: boolean; generations?: Array<{ id: string; brandName: string; imageUrl: string; qualityScore?: number }> }> : null)
+        .then((payload) => {
+          if (payload?.ok && Array.isArray(payload.generations) && payload.generations.length > 0) {
+            const mapped: ShowcaseLogoItem[] = payload.generations.map((g) => ({
+              id: `dyn-${g.id}`,
+              name: g.brandName,
+              category: 'tech' as const,
+              tag: 'Recent Studio Generation',
+              style: 'AI Vector Mark',
+              imageSrc: g.imageUrl,
+            }));
+            setDynamicLogos(mapped);
           }
         })
         .catch(() => undefined);
@@ -568,31 +578,30 @@ export default function Home() {
               </div>
             </section>
 
-            {/* Extensive 24-Logo Showcase Gallery */}
+            {/* Real Studio Generated Logos Showcase Gallery */}
             <section id="showcase" data-reveal className="reveal-section bg-[#10100e] px-5 py-20 text-white sm:px-8 lg:py-28">
               <div className="mx-auto max-w-7xl">
                 <div className="flex flex-col gap-6 border-b border-white/10 pb-10 lg:flex-row lg:items-end lg:justify-between">
                   <div>
                     <div className="inline-flex items-center gap-2 rounded-full border border-[#c6ff4a]/30 bg-[#c6ff4a]/10 px-3.5 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-[#c6ff4a]">
-                      <span>✦</span> 24 Production Showcase Marks
+                      <span>✦</span> Wordmarks Studio Production Marks
                     </div>
                     <h2 className="mt-4 max-w-2xl text-4xl font-black leading-[0.92] tracking-[-0.065em] sm:text-6xl">
-                      Crafted by Wordmarks Studio.
+                      Real marks generated by our studio.
                     </h2>
                     <p className="mt-4 max-w-xl text-sm leading-6 text-white/55">
-                      Explore real wordmarks generated across diverse design languages—from stark Swiss minimalism to haute couture serifs and bleeding-edge tech.
+                      Explore real logos produced by our AI identity engine—from bespoke serifs and luxury apothecary seals to precision tech marks.
                     </p>
                   </div>
 
                   {/* Filter Pills */}
                   <div className="flex flex-wrap gap-2 text-xs font-bold">
                     {[
-                      { key: 'all', label: 'All Logos (24)' },
-                      { key: 'tech', label: 'Tech & AI (5)' },
-                      { key: 'luxury', label: 'Luxury (5)' },
-                      { key: 'minimalist', label: 'Minimalist (5)' },
-                      { key: 'lifestyle', label: 'Lifestyle (5)' },
-                      { key: 'fintech', label: 'Fintech (4)' },
+                      { key: 'all', label: `All Logos (${dynamicLogos.length + showcaseLogos.length})` },
+                      { key: 'luxury', label: 'Luxury & Couture' },
+                      { key: 'lifestyle', label: 'Lifestyle & Dining' },
+                      { key: 'botanical', label: 'Botanical & Organic' },
+                      { key: 'tech', label: 'Tech & Identity' },
                     ].map((tab) => (
                       <button
                         key={tab.key}
@@ -610,53 +619,115 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Grid of Logos */}
-                <div className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                  {showcaseLogos
+                {/* Grid of Real Generated Logos */}
+                <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {[...dynamicLogos, ...showcaseLogos]
                     .filter((item) => galleryFilter === 'all' || item.category === galleryFilter)
                     .map((item) => (
                       <div
                         key={item.id}
-                        className={`group relative flex min-h-[220px] flex-col justify-between overflow-hidden rounded-2xl border border-white/10 ${item.bgClass} p-6 transition-all duration-300 hover:-translate-y-1 hover:border-white/30 hover:shadow-2xl`}
+                        className="group relative flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#141412] transition-all duration-300 hover:-translate-y-1.5 hover:border-[#c6ff4a]/40 hover:shadow-2xl hover:shadow-[#c6ff4a]/10"
                       >
-                        {/* Top tag & category badge */}
-                        <div className="flex items-center justify-between">
-                          <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-white/70">
-                            {item.category}
-                          </span>
-                          <span className="text-[10px] font-mono text-white/40">
-                            {item.style}
-                          </span>
-                        </div>
-
-                        {/* Visual Typographic Mark */}
-                        <div className="my-auto py-6 text-center">
-                          <div className="flex items-center justify-center gap-2">
-                            <span className={`text-2xl sm:text-3xl ${item.fontClass} ${item.textClass}`}>
-                              {item.name}
+                        {/* Real Image container with click-to-preview */}
+                        <div
+                          className="relative aspect-[4/3] w-full overflow-hidden bg-black/60 cursor-pointer"
+                          onClick={() => setLightboxLogo(item)}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={item.imageSrc}
+                            alt={`${item.name} logo`}
+                            className={`h-full w-full transition-transform duration-500 group-hover:scale-105 ${
+                              item.isSvg ? 'object-contain p-6 bg-[#09090b]' : 'object-cover'
+                            }`}
+                            loading="lazy"
+                          />
+                          {/* Badges */}
+                          <div className="absolute inset-x-3 top-3 flex items-center justify-between pointer-events-none">
+                            <span className="rounded-full border border-white/15 bg-black/70 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-white backdrop-blur-md">
+                              {item.category}
                             </span>
-                            {item.symbol ? (
-                              <span className={`text-sm ${item.subClass}`}>{item.symbol}</span>
-                            ) : null}
+                            <span className="rounded-full border border-[#c6ff4a]/30 bg-black/70 px-2.5 py-0.5 text-[9px] font-mono font-bold text-[#c6ff4a] backdrop-blur-md">
+                              Studio Mark
+                            </span>
                           </div>
-                          <p className={`mt-1.5 text-[9px] font-bold uppercase tracking-[0.25em] ${item.subClass}`}>
-                            {item.tag}
-                          </p>
+                          {/* Hover inspection overlay */}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 flex items-end p-3.5">
+                            <span className="text-[11px] font-bold text-white flex items-center gap-1.5 drop-shadow">
+                              <span>🔍</span> Click to inspect full mark
+                            </span>
+                          </div>
                         </div>
 
-                        {/* Bottom CTA / Inspiration action */}
-                        <div className="flex items-center justify-between border-t border-white/10 pt-3 text-[10px]">
-                          <span className="text-white/40">Vector SVG + PNG</span>
-                          <a
-                            href="#create"
-                            className="font-bold text-[#c6ff4a] opacity-80 transition-opacity group-hover:opacity-100 hover:underline"
-                          >
-                            Generate similar ↗
-                          </a>
+                        {/* Card metadata & Studio action */}
+                        <div className="flex flex-1 flex-col justify-between p-4 bg-[#141412]">
+                          <div>
+                            <div className="flex items-baseline justify-between gap-2">
+                              <h3 className="text-base font-black tracking-tight text-white">{item.name}</h3>
+                              <span className="text-[10px] font-mono text-white/40">{item.style}</span>
+                            </div>
+                            <p className="mt-1 text-xs text-white/60">{item.tag}</p>
+                          </div>
+
+                          <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-3 text-[11px]">
+                            <span className="text-white/40 font-mono text-[10px]">Vector SVG + PNG</span>
+                            <a
+                              href="#create"
+                              className="font-bold text-[#c6ff4a] opacity-90 transition-opacity hover:opacity-100 hover:underline flex items-center gap-1"
+                            >
+                              Generate similar ↗
+                            </a>
+                          </div>
                         </div>
                       </div>
                     ))}
                 </div>
+
+                {/* Lightbox Modal */}
+                {lightboxLogo && (
+                  <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md"
+                    onClick={() => setLightboxLogo(null)}
+                  >
+                    <div
+                      className="relative max-w-2xl w-full overflow-hidden rounded-3xl border border-white/20 bg-[#171714] p-6 shadow-2xl"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center justify-between pb-4 border-b border-white/10">
+                        <div>
+                          <span className="text-[10px] font-mono uppercase tracking-wider text-[#c6ff4a]">Wordmarks Studio Generation</span>
+                          <h3 className="text-2xl font-black text-white">{lightboxLogo.name}</h3>
+                          <p className="text-xs text-white/60">{lightboxLogo.tag} · {lightboxLogo.style}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setLightboxLogo(null)}
+                          className="grid h-8 w-8 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20 text-sm font-bold"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <div className="my-6 flex justify-center rounded-2xl overflow-hidden bg-black/50 p-2 max-h-[60vh]">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={lightboxLogo.imageSrc}
+                          alt={lightboxLogo.name}
+                          className="max-h-[55vh] w-auto rounded-xl object-contain shadow-2xl"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between pt-2 border-t border-white/10">
+                        <span className="text-xs text-white/50">Ready for export in SVG + PNG + WebP</span>
+                        <a
+                          href="#create"
+                          onClick={() => setLightboxLogo(null)}
+                          className="rounded-full bg-[#c6ff4a] px-5 py-2.5 text-xs font-black uppercase tracking-wider text-black transition-transform hover:-translate-y-0.5"
+                        >
+                          Generate Similar Mark
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Studio CTA strip below gallery */}
                 <div className="mt-12 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/5 p-6">
