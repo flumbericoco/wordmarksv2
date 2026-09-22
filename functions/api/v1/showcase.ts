@@ -4,15 +4,15 @@ interface Env {
 
 export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
   const curatedLogos = [
-    { id: 'apexlab', brandName: 'ApexLab', category: 'tech', tag: 'Biotech & AI Research', style: 'Precision Geometric Tech', imageUrl: '/showcase/apexlab.png' },
-    { id: 'sentrio', brandName: 'Sentrio', category: 'tech', tag: 'Intelligent Automation Cloud', style: 'Dynamic Streamline Sans', imageUrl: '/showcase/sentrio.png' },
-    { id: 'arclume', brandName: 'Arclume', category: 'design', tag: 'Architecture & Spatial Light', style: 'Architectural Apex Monogram', imageUrl: '/showcase/arclume.png' },
-    { id: 'gridora', brandName: 'Gridora', category: 'cloud', tag: 'Distributed Compute Mesh', style: 'Isometric Hexagon Emblem', imageUrl: '/showcase/gridora.png' },
-    { id: 'velisse', brandName: 'Velisse', category: 'luxury', tag: 'Haute Couture & Skincare', style: 'Botanical Leaf Serif', imageUrl: '/showcase/velisse.png' },
-    { id: 'nodera', brandName: 'Nodera', category: 'tech', tag: 'Data Systems & Knowledge Engine', style: 'Folded Prism Monogram', imageUrl: '/showcase/nodera.png' },
-    { id: 'arvena', brandName: 'ARVENA', category: 'tech', tag: 'Aerospace & Precision Systems', style: 'Minimal Apex Chevron', imageUrl: '/showcase/arvena.png' },
-    { id: 'pesat', brandName: 'Pesat.ai', category: 'cloud', tag: 'Enterprise AI & Agent Platform', style: 'Bold Tech Loop Emblem', imageUrl: '/showcase/pesat.png' },
-    { id: 'presto', brandName: 'Presto', category: 'cloud', tag: 'High-Velocity Logistics', style: 'Kinetic Vortex Pinwheel', imageUrl: '/showcase/presto.png' },
+    { id: 'apexlab', brandName: 'ApexLab', category: 'tech', tag: 'Biotech & AI Research', style: 'Precision Geometric Tech', imageUrl: '/showcase/apexlab-v2.png' },
+    { id: 'sentrio', brandName: 'Sentrio', category: 'tech', tag: 'Intelligent Automation Cloud', style: 'Dynamic Streamline Sans', imageUrl: '/showcase/sentrio-v2.png' },
+    { id: 'arclume', brandName: 'Arclume', category: 'design', tag: 'Architecture & Spatial Light', style: 'Architectural Apex Monogram', imageUrl: '/showcase/arclume-v2.png' },
+    { id: 'gridora', brandName: 'Gridora', category: 'cloud', tag: 'Distributed Compute Mesh', style: 'Isometric Hexagon Emblem', imageUrl: '/showcase/gridora-v2.png' },
+    { id: 'velisse', brandName: 'Velisse', category: 'luxury', tag: 'Haute Couture & Skincare', style: 'Botanical Leaf Serif', imageUrl: '/showcase/velisse-v2.png' },
+    { id: 'nodera', brandName: 'Nodera', category: 'tech', tag: 'Data Systems & Knowledge Engine', style: 'Folded Prism Monogram', imageUrl: '/showcase/nodera-v2.png' },
+    { id: 'arvena', brandName: 'ARVENA', category: 'tech', tag: 'Aerospace & Precision Systems', style: 'Minimal Apex Chevron', imageUrl: '/showcase/arvena-v2.png' },
+    { id: 'pesat', brandName: 'Pesat.ai', category: 'cloud', tag: 'Enterprise AI & Agent Platform', style: 'Bold Tech Loop Emblem', imageUrl: '/showcase/pesat-v2.png' },
+    { id: 'presto', brandName: 'Presto', category: 'cloud', tag: 'High-Velocity Logistics', style: 'Kinetic Vortex Pinwheel', imageUrl: '/showcase/presto-v2.png' },
   ];
 
   try {

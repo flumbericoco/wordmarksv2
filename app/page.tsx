@@ -39,15 +39,15 @@ export interface ShowcaseLogoItem {
 }
 
 const showcaseLogos: ShowcaseLogoItem[] = [
-  { id: 'apexlab', name: 'ApexLab', category: 'tech', tag: 'Biotech & AI Research', style: 'Precision Geometric Tech', imageSrc: '/showcase/apexlab.png' },
-  { id: 'sentrio', name: 'Sentrio', category: 'tech', tag: 'Intelligent Automation Cloud', style: 'Dynamic Streamline Sans', imageSrc: '/showcase/sentrio.png' },
-  { id: 'arclume', name: 'Arclume', category: 'design', tag: 'Architecture & Spatial Light', style: 'Architectural Apex Monogram', imageSrc: '/showcase/arclume.png' },
-  { id: 'gridora', name: 'Gridora', category: 'cloud', tag: 'Distributed Compute Mesh', style: 'Isometric Hexagon Emblem', imageSrc: '/showcase/gridora.png' },
-  { id: 'velisse', name: 'Velisse', category: 'luxury', tag: 'Haute Couture & Skincare', style: 'Botanical Leaf Serif', imageSrc: '/showcase/velisse.png' },
-  { id: 'nodera', name: 'Nodera', category: 'tech', tag: 'Data Systems & Knowledge Engine', style: 'Folded Prism Monogram', imageSrc: '/showcase/nodera.png' },
-  { id: 'arvena', name: 'ARVENA', category: 'tech', tag: 'Aerospace & Precision Systems', style: 'Minimal Apex Chevron', imageSrc: '/showcase/arvena.png' },
-  { id: 'pesat', name: 'Pesat.ai', category: 'cloud', tag: 'Enterprise AI & Agent Platform', style: 'Bold Tech Loop Emblem', imageSrc: '/showcase/pesat.png' },
-  { id: 'presto', name: 'Presto', category: 'cloud', tag: 'High-Velocity Logistics', style: 'Kinetic Vortex Pinwheel', imageSrc: '/showcase/presto.png' },
+  { id: 'apexlab', name: 'ApexLab', category: 'tech', tag: 'Biotech & AI Research', style: 'Precision Geometric Tech', imageSrc: '/showcase/apexlab-v2.png' },
+  { id: 'sentrio', name: 'Sentrio', category: 'tech', tag: 'Intelligent Automation Cloud', style: 'Dynamic Streamline Sans', imageSrc: '/showcase/sentrio-v2.png' },
+  { id: 'arclume', name: 'Arclume', category: 'design', tag: 'Architecture & Spatial Light', style: 'Architectural Apex Monogram', imageSrc: '/showcase/arclume-v2.png' },
+  { id: 'gridora', name: 'Gridora', category: 'cloud', tag: 'Distributed Compute Mesh', style: 'Isometric Hexagon Emblem', imageSrc: '/showcase/gridora-v2.png' },
+  { id: 'velisse', name: 'Velisse', category: 'luxury', tag: 'Haute Couture & Skincare', style: 'Botanical Leaf Serif', imageSrc: '/showcase/velisse-v2.png' },
+  { id: 'nodera', name: 'Nodera', category: 'tech', tag: 'Data Systems & Knowledge Engine', style: 'Folded Prism Monogram', imageSrc: '/showcase/nodera-v2.png' },
+  { id: 'arvena', name: 'ARVENA', category: 'tech', tag: 'Aerospace & Precision Systems', style: 'Minimal Apex Chevron', imageSrc: '/showcase/arvena-v2.png' },
+  { id: 'pesat', name: 'Pesat.ai', category: 'cloud', tag: 'Enterprise AI & Agent Platform', style: 'Bold Tech Loop Emblem', imageSrc: '/showcase/pesat-v2.png' },
+  { id: 'presto', name: 'Presto', category: 'cloud', tag: 'High-Velocity Logistics', style: 'Kinetic Vortex Pinwheel', imageSrc: '/showcase/presto-v2.png' },
 ];
 
 async function makeReviewPreview(imageUrl: string): Promise<string> {
@@ -601,15 +601,15 @@ export default function Home() {
                       >
                         {/* Real Image container with click-to-preview */}
                         <div
-                          className="relative aspect-square w-full overflow-hidden bg-white p-6 flex items-center justify-center cursor-pointer"
+                          className="relative aspect-[16/10] w-full overflow-hidden bg-white p-6 sm:p-8 flex items-center justify-center cursor-pointer"
                           onClick={() => setLightboxLogo(item)}
                         >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={item.imageSrc}
                             alt={`${item.name} logo`}
-                            className="max-h-40 w-auto object-contain transition-transform duration-500 group-hover:scale-110"
-                            loading="lazy"
+                            className="max-h-36 sm:max-h-44 w-auto max-w-[88%] object-contain transition-transform duration-500 group-hover:scale-105"
+                            loading="eager"
                           />
                           {/* Badges */}
                           <div className="absolute inset-x-3 top-3 flex items-center justify-between pointer-events-none">
