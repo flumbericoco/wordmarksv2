@@ -14,6 +14,34 @@ export const PAYPAL_PRODUCTS = {
     credits: 25,
     kind: 'topup',
   },
+  credit_1: {
+    name: 'Wordmarks 1 Logo Credit',
+    amount: '1.00',
+    amountCents: 100,
+    credits: 1,
+    kind: 'topup',
+  },
+  credit_5: {
+    name: 'Wordmarks 5 Logo Credits',
+    amount: '5.00',
+    amountCents: 500,
+    credits: 5,
+    kind: 'topup',
+  },
+  credit_10: {
+    name: 'Wordmarks 10 Logo Credits',
+    amount: '10.00',
+    amountCents: 1000,
+    credits: 10,
+    kind: 'topup',
+  },
+  credit_25: {
+    name: 'Wordmarks 25 Logo Credits',
+    amount: '25.00',
+    amountCents: 2500,
+    credits: 25,
+    kind: 'topup',
+  },
   lite: {
     name: 'Wordmarks Lite Plan (1 Credit/mo)',
     amount: '1.00',
@@ -42,9 +70,44 @@ export const PAYPAL_PRODUCTS = {
     credits: 28,
     kind: 'subscription',
   },
+  byok_lifetime: {
+    name: 'Wordmarks Lifetime Deal (BYOK)',
+    amount: '19.00',
+    amountCents: 1900,
+    credits: 100,
+    kind: 'lifetime',
+  },
 } as const;
 
 export type PayPalProductKey = keyof typeof PAYPAL_PRODUCTS;
+
+export interface BYOKStatus {
+  salesCount: number;
+  currentPrice: number;
+  currentPriceStr: string;
+  currentPriceCents: number;
+  tier: number;
+  slotsRemaining: number;
+  nextPrice: number;
+}
+
+export async function getBYOKStatus(db: D1Database): Promise<BYOKStatus> {
+  const row = await db.prepare("SELECT value FROM settings WHERE key = 'byokSalesCount'").first<{ value: string }>();
+  const salesCount = Math.max(0, parseInt(row?.value || '0', 10) || 0);
+  const tierIndex = Math.floor(salesCount / 5);
+  const currentPrice = 19 + tierIndex * 10;
+  const nextPrice = currentPrice + 10;
+  const slotsRemaining = 5 - (salesCount % 5);
+  return {
+    salesCount,
+    currentPrice,
+    currentPriceStr: `${currentPrice}.00`,
+    currentPriceCents: currentPrice * 100,
+    tier: tierIndex + 1,
+    slotsRemaining,
+    nextPrice,
+  };
+}
 
 export async function getPayPalConfig(db: D1Database, env: unknown): Promise<PayPalConfig> {
   const envObj = (env || {}) as Record<string, unknown>;
@@ -142,8 +205,9 @@ export async function testPayPalCredentials(clientId: string, clientSecret: stri
 export interface CreateOrderParams {
   userId: string;
   userEmail: string;
-  productKey: PayPalProductKey;
+  productKey: PayPalProductKey | string;
   origin: string;
+  customCredits?: number;
 }
 
 export async function createPayPalOrder(
@@ -156,15 +220,36 @@ export async function createPayPalOrder(
     throw new Error('PayPal is not configured. Please enter PayPal Client ID and Secret in Admin.');
   }
 
-  const product = PAYPAL_PRODUCTS[params.productKey];
-  if (!product) {
+  let productName = 'Wordmarks Logo Credits';
+  let amountStr = '25.00';
+  let productKind: 'topup' | 'subscription' | 'lifetime' = 'topup';
+  let creditsAwarded = 25;
+
+  if (params.productKey === 'byok_lifetime') {
+    const byok = await getBYOKStatus(db);
+    productName = `Wordmarks Lifetime Deal (BYOK) - Early Bird Tier ${byok.tier}`;
+    amountStr = byok.currentPriceStr;
+    productKind = 'lifetime';
+    creditsAwarded = 100;
+  } else if (params.customCredits && params.customCredits >= 1) {
+    creditsAwarded = Math.floor(params.customCredits);
+    amountStr = `${creditsAwarded}.00`;
+    productName = `Wordmarks ${creditsAwarded} Logo ${creditsAwarded === 1 ? 'Credit' : 'Credits'}`;
+    productKind = 'topup';
+  } else if (params.productKey in PAYPAL_PRODUCTS) {
+    const p = PAYPAL_PRODUCTS[params.productKey as PayPalProductKey];
+    productName = p.name;
+    amountStr = p.amount;
+    productKind = p.kind;
+    creditsAwarded = p.credits;
+  } else {
     throw new Error(`Invalid purchase product: ${params.productKey}`);
   }
 
   const accessToken = await getPayPalAccessToken(config.clientId, config.clientSecret, config.mode);
   const base = getPayPalApiBase(config.mode);
 
-  const customId = `${params.userId}:${params.productKey}:${product.kind}`;
+  const customId = `${params.userId}:${params.productKey}:${productKind}:${params.customCredits || ''}`;
   const returnUrl = `${params.origin}/account?paypal=success&product=${params.productKey}`;
   const cancelUrl = `${params.origin}/account?paypal=cancelled`;
 
@@ -173,24 +258,24 @@ export async function createPayPalOrder(
     purchase_units: [
       {
         reference_id: `wordmarks-${params.userId.slice(0, 8)}-${Date.now()}`,
-        description: product.name,
+        description: productName,
         custom_id: customId,
         amount: {
           currency_code: 'USD',
-          value: product.amount,
+          value: amountStr,
           breakdown: {
             item_total: {
               currency_code: 'USD',
-              value: product.amount,
+              value: amountStr,
             },
           },
         },
         items: [
           {
-            name: product.name,
+            name: productName,
             unit_amount: {
               currency_code: 'USD',
-              value: product.amount,
+              value: amountStr,
             },
             quantity: '1',
             category: 'DIGITAL_GOODS',
@@ -331,14 +416,14 @@ export async function capturePayPalOrder(
   const purchaseUnits = (orderData.purchase_units as Array<Record<string, unknown>>) || [];
   const unit = purchaseUnits[0] || {};
   const customId = String(unit.custom_id || '');
-  const [orderUserId, productKeyRaw] = customId.split(':');
+  const [orderUserId, productKeyRaw, kindRaw, customCreditsRaw] = customId.split(':');
 
   if (orderUserId && orderUserId !== expectedUserId) {
     throw new Error('This PayPal transaction belongs to a different user account');
   }
 
-  const productKey = (productKeyRaw || 'topup') as PayPalProductKey;
-  const product = PAYPAL_PRODUCTS[productKey] || PAYPAL_PRODUCTS.topup;
+  const productKey = productKeyRaw || 'topup';
+  const customCreditsNum = customCreditsRaw ? parseInt(customCreditsRaw, 10) : 0;
 
   const payments = (unit.payments as Record<string, unknown>) || {};
   const captures = (payments.captures as Array<Record<string, unknown>>) || [];
@@ -349,18 +434,47 @@ export async function capturePayPalOrder(
   const payer = (orderData.payer as Record<string, unknown>) || {};
   const payerEmail = typeof payer.email_address === 'string' ? payer.email_address : undefined;
 
-  const credits = product.credits;
+  let credits = 25;
+  let kind = 'topup';
+  let amountCents = Math.round(parseFloat(amountObj.value || '25') * 100);
+
+  if (productKey === 'byok_lifetime' || kindRaw === 'lifetime') {
+    credits = 100;
+    kind = 'lifetime';
+  } else if (customCreditsNum >= 1) {
+    credits = customCreditsNum;
+    kind = 'topup';
+    amountCents = customCreditsNum * 100;
+  } else if (productKey in PAYPAL_PRODUCTS) {
+    const p = PAYPAL_PRODUCTS[productKey as PayPalProductKey];
+    credits = p.credits;
+    kind = p.kind;
+    amountCents = p.amountCents;
+  }
+
+  const reason = kind === 'lifetime'
+    ? 'lifetime_byok_activation'
+    : kind === 'subscription'
+    ? 'subscription_activation'
+    : 'credit_topup';
+
   const statements: D1PreparedStatement[] = [
     db.prepare('INSERT INTO credit_ledger(id, user_id, amount, reason, reference) VALUES (?, ?, ?, ?, ?)')
-      .bind(crypto.randomUUID(), expectedUserId, credits, product.kind === 'topup' ? 'credit_topup' : 'subscription_activation', reference),
+      .bind(crypto.randomUUID(), expectedUserId, credits, reason, reference),
     db.prepare("UPDATE users SET credits = credits + ?, updated_at = datetime('now') WHERE id = ?").bind(credits, expectedUserId),
     db.prepare(`INSERT INTO payment_transactions
       (id, user_id, stripe_checkout_id, stripe_payment_intent_id, kind, amount, currency, credits, status)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'paid')`)
-      .bind(crypto.randomUUID(), expectedUserId, reference, captureId, `paypal_${product.kind}`, product.amountCents, currency.toLowerCase(), credits),
+      .bind(crypto.randomUUID(), expectedUserId, reference, captureId, `paypal_${kind}`, amountCents, currency.toLowerCase(), credits),
   ];
 
-  if (product.kind === 'subscription') {
+  if (kind === 'lifetime') {
+    statements.push(
+      db.prepare("UPDATE users SET plan = 'byok_lifetime', updated_at = datetime('now') WHERE id = ?").bind(expectedUserId),
+      db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES ('byokSalesCount', '1', datetime('now'))
+        ON CONFLICT(key) DO UPDATE SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT), updated_at = datetime('now')`)
+    );
+  } else if (kind === 'subscription') {
     statements.push(
       db.prepare("UPDATE users SET plan = ?, updated_at = datetime('now') WHERE id = ?").bind(productKey, expectedUserId),
       db.prepare(`INSERT INTO subscriptions(id, user_id, stripe_subscription_id, plan, status)
@@ -386,8 +500,8 @@ export async function capturePayPalOrder(
     creditsAdded: credits,
     newCredits: updatedUser?.credits ?? 0,
     productKey,
-    kind: product.kind,
-    amount: product.amountCents,
+    kind,
+    amount: amountCents,
     currency,
     payerEmail,
   };

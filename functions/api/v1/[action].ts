@@ -795,7 +795,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         if (!validated.valid) throw new ValidationError(validated.error);
         const spendReference = `web-generation:${requestId}`;
         let creditReserved = false;
-        if (user) {
+        const isLifetimeBYOK = user?.plan === 'byok_lifetime';
+        if (user && !isLifetimeBYOK) {
           const reservation = await env.DB.batch([
             env.DB.prepare('INSERT INTO credit_ledger(id,user_id,amount,reason,reference) SELECT ?,?,-1,?,? WHERE EXISTS(SELECT 1 FROM users WHERE id=? AND credits>0)')
               .bind(crypto.randomUUID(), user.id, 'logo_generation', spendReference, user.id),

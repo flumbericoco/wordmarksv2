@@ -143,17 +143,20 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       return jsonRpcError(rpc.id, -32602, 'Tool arguments must be an object');
     }
 
+    const isLifetimeBYOK = apiUser.plan === 'byok_lifetime';
     const spendReference = `mcp-generation:${crypto.randomUUID()}`;
-    const reservation = await env.DB.batch([
-      env.DB.prepare('INSERT INTO credit_ledger(id,user_id,amount,reason,reference) SELECT ?,?,-1,?,? WHERE EXISTS(SELECT 1 FROM users WHERE id=? AND credits>0)')
-        .bind(crypto.randomUUID(), apiUser.id, 'logo_generation', spendReference, apiUser.id),
-      env.DB.prepare("UPDATE users SET credits=credits-1, updated_at=datetime('now') WHERE id=? AND credits>0").bind(apiUser.id),
-    ]);
-    if (!reservation[1].meta.changes) {
-      return jsonRpc(rpc.id, {
-        content: [{ type: 'text', text: 'Insufficient credits. Top up your Wordmarks account.' }],
-        isError: true,
-      });
+    if (!isLifetimeBYOK) {
+      const reservation = await env.DB.batch([
+        env.DB.prepare('INSERT INTO credit_ledger(id,user_id,amount,reason,reference) SELECT ?,?,-1,?,? WHERE EXISTS(SELECT 1 FROM users WHERE id=? AND credits>0)')
+          .bind(crypto.randomUUID(), apiUser.id, 'logo_generation', spendReference, apiUser.id),
+        env.DB.prepare("UPDATE users SET credits=credits-1, updated_at=datetime('now') WHERE id=? AND credits>0").bind(apiUser.id),
+      ]);
+      if (!reservation[1].meta.changes) {
+        return jsonRpc(rpc.id, {
+          content: [{ type: 'text', text: 'Insufficient credits. Top up your Wordmarks account.' }],
+          isError: true,
+        });
+      }
     }
 
     let payload: Record<string, unknown>;
@@ -172,11 +175,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       payload = await apiResponse.json<Record<string, unknown>>();
       if (!apiResponse.ok || payload.ok !== true) throw new Error(String(payload.error || 'Logo generation failed'));
     } catch (error) {
-      await env.DB.batch([
-        env.DB.prepare("UPDATE users SET credits = credits + 1, updated_at = datetime('now') WHERE id = ?").bind(apiUser.id),
-        env.DB.prepare('INSERT OR IGNORE INTO credit_ledger (id, user_id, amount, reason, reference) VALUES (?, ?, 1, ?, ?)')
-          .bind(crypto.randomUUID(), apiUser.id, 'generation_refund', `refund:${spendReference}`),
-      ]);
+      if (!isLifetimeBYOK) {
+        await env.DB.batch([
+          env.DB.prepare("UPDATE users SET credits = credits + 1, updated_at = datetime('now') WHERE id = ?").bind(apiUser.id),
+          env.DB.prepare('INSERT OR IGNORE INTO credit_ledger (id, user_id, amount, reason, reference) VALUES (?, ?, 1, ?, ?)')
+            .bind(crypto.randomUUID(), apiUser.id, 'generation_refund', `refund:${spendReference}`),
+        ]);
+      }
       return jsonRpc(rpc.id, {
         content: [{ type: 'text', text: error instanceof Error ? error.message : 'Logo generation failed' }],
         isError: true,
@@ -186,11 +191,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const data = payload.data as Record<string, unknown>;
     const generatedImage = decodeGeneratedImage(data.imageUrl);
     if (!generatedImage) {
-      await env.DB.batch([
-        env.DB.prepare("UPDATE users SET credits = credits + 1, updated_at=datetime('now') WHERE id = ?").bind(apiUser.id),
-        env.DB.prepare('INSERT OR IGNORE INTO credit_ledger (id,user_id,amount,reason,reference) VALUES (?,?,?,?,?)')
-          .bind(crypto.randomUUID(), apiUser.id, 1, 'generation_refund', `refund:${spendReference}`),
-      ]);
+      if (!isLifetimeBYOK) {
+        await env.DB.batch([
+          env.DB.prepare("UPDATE users SET credits = credits + 1, updated_at=datetime('now') WHERE id = ?").bind(apiUser.id),
+          env.DB.prepare('INSERT OR IGNORE INTO credit_ledger (id,user_id,amount,reason,reference) VALUES (?,?,?,?,?)')
+            .bind(crypto.randomUUID(), apiUser.id, 1, 'generation_refund', `refund:${spendReference}`),
+        ]);
+      }
       return jsonRpc(rpc.id, {
         content: [{ type: 'text', text: 'The provider returned an invalid logo image. Your credit was refunded.' }],
         isError: true,

@@ -18,8 +18,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const body = (typeof rawBody === 'object' && rawBody !== null ? rawBody : {}) as Record<string, unknown>;
   const rawKey = String(body.product || body.plan || 'topup').toLowerCase();
 
-  const productKey: PayPalProductKey = (rawKey in PAYPAL_PRODUCTS)
+  const customCredits = body.customCredits ? Number(body.customCredits) : body.credits ? Number(body.credits) : undefined;
+
+  const productKey: PayPalProductKey | string = (rawKey in PAYPAL_PRODUCTS)
     ? (rawKey as PayPalProductKey)
+    : customCredits && customCredits >= 1
+    ? 'topup'
     : 'topup';
 
   try {
@@ -29,6 +33,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       userEmail: user.email,
       productKey,
       origin,
+      customCredits: customCredits && customCredits >= 1 ? customCredits : undefined,
     });
 
     return Response.json({

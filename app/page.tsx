@@ -29,6 +29,46 @@ const pricingPlans = [
   { name: 'Scale', monthly: '$17', monthlyCredits: '28', effective: '$0.61', featured: false },
 ];
 
+export interface ShowcaseLogoItem {
+  id: string;
+  name: string;
+  category: 'tech' | 'luxury' | 'minimalist' | 'lifestyle' | 'fintech';
+  tag: string;
+  style: string;
+  bgClass: string;
+  textClass: string;
+  subClass: string;
+  symbol?: string;
+  fontClass: string;
+}
+
+const showcaseLogos: ShowcaseLogoItem[] = [
+  { id: 'kinetic', name: 'KINETIC', category: 'tech', tag: 'AI Motion Systems', style: 'Grotesque Italic', bgClass: 'bg-[#0f172a]', textClass: 'text-white', subClass: 'text-[#38bdf8]', symbol: '✦', fontClass: 'font-black italic tracking-[-0.07em]' },
+  { id: 'aurelia', name: 'AURELIA', category: 'luxury', tag: 'Haute Horlogerie', style: 'Roman Serif', bgClass: 'bg-[#181512]', textClass: 'text-[#f5f0e6]', subClass: 'text-[#d4af37]', symbol: '◈', fontClass: 'font-serif tracking-[0.24em]' },
+  { id: 'kanso', name: 'kanso', category: 'minimalist', tag: 'Spatial Architecture', style: 'Organic Humanist', bgClass: 'bg-[#f4f1ea]', textClass: 'text-[#171714]', subClass: 'text-[#7c3aed]', symbol: '—', fontClass: 'font-serif italic tracking-tight' },
+  { id: 'vault', name: 'VAULT', category: 'fintech', tag: 'Institutional Custody', style: 'Monolithic Heavy', bgClass: 'bg-[#09090b]', textClass: 'text-white', subClass: 'text-[#22c55e]', symbol: '■', fontClass: 'font-black tracking-[-0.05em]' },
+  { id: 'roast', name: 'ROAST & CO', category: 'lifestyle', tag: 'Specialty Roastery', style: 'Artisanal Slab', bgClass: 'bg-[#231815]', textClass: 'text-[#fdf0ed]', subClass: 'text-[#e07a5f]', symbol: '☕', fontClass: 'font-serif font-bold tracking-[0.06em]' },
+  { id: 'synapse', name: 'SYNAPSE', category: 'tech', tag: 'Neural Compute', style: 'Futuristic Monospace', bgClass: 'bg-[#030712]', textClass: 'text-[#e2e8f0]', subClass: 'text-[#06b6d4]', symbol: '::', fontClass: 'font-mono font-bold tracking-[0.22em]' },
+  { id: 'maison-v', name: 'MAISON V', category: 'luxury', tag: 'Parisian Couture', style: 'Refined Hairline', bgClass: 'bg-[#121212]', textClass: 'text-white', subClass: 'text-white/50', symbol: '·', fontClass: 'font-serif font-light tracking-[0.28em]' },
+  { id: 'forme', name: 'forme.', category: 'minimalist', tag: 'Industrial Design', style: 'Swiss Neo-Grotesk', bgClass: 'bg-[#ffffff]', textClass: 'text-black', subClass: 'text-[#ff5c35]', symbol: '•', fontClass: 'font-black tracking-[-0.04em]' },
+  { id: 'meridian', name: 'MERIDIAN', category: 'fintech', tag: 'Global Liquidity', style: 'Corporate Modern', bgClass: 'bg-[#0b1329]', textClass: 'text-white', subClass: 'text-[#3b82f6]', symbol: '/', fontClass: 'font-black tracking-[0.06em]' },
+  { id: 'ember', name: 'ember', category: 'lifestyle', tag: 'Artisan Hearth', style: 'Warm Humanist', bgClass: 'bg-[#1f1412]', textClass: 'text-[#ffedd5]', subClass: 'text-[#f97316]', symbol: '✳', fontClass: 'font-serif font-bold italic' },
+  { id: 'neura', name: 'NEURA', category: 'tech', tag: 'Autonomous AI', style: 'Precision Tech Sans', bgClass: 'bg-[#0a0a0c]', textClass: 'text-white', subClass: 'text-[#a855f7]', symbol: '▲', fontClass: 'font-black tracking-[-0.06em]' },
+  { id: 'noir', name: 'NOIR & CO.', category: 'luxury', tag: 'Fine Leathercraft', style: 'Obsidian Serif', bgClass: 'bg-[#0d0d0d]', textClass: 'text-white', subClass: 'text-white/60', symbol: '✦', fontClass: 'font-serif font-black tracking-[0.16em]' },
+  { id: 'studio9', name: 'STUDIO 09', category: 'minimalist', tag: 'Creative Direction', style: 'Bauhaus Grid', bgClass: 'bg-[#f8f9fa]', textClass: 'text-black', subClass: 'text-[#16a34a]', symbol: '09', fontClass: 'font-black tracking-[-0.05em]' },
+  { id: 'apex', name: 'APEX', category: 'fintech', tag: 'Quantitative Wealth', style: 'Kinetic Chevron', bgClass: 'bg-[#0f172a]', textClass: 'text-white', subClass: 'text-[#10b981]', symbol: '▲', fontClass: 'font-black tracking-[0.05em]' },
+  { id: 'botanica', name: 'BOTANICA', category: 'lifestyle', tag: 'Botanical Skincare', style: 'Flourish Editorial', bgClass: 'bg-[#1c2826]', textClass: 'text-[#dad7cd]', subClass: 'text-[#a3b18a]', symbol: '🌿', fontClass: 'font-serif tracking-[0.2em]' },
+  { id: 'orbit', name: 'ORBIT', category: 'tech', tag: 'Observability Cloud', style: 'Astronav Mono', bgClass: 'bg-[#0b0f19]', textClass: 'text-white', subClass: 'text-[#818cf8]', symbol: '◎', fontClass: 'font-mono font-bold tracking-[0.16em]' },
+  { id: 'velour', name: 'VELOUR', category: 'luxury', tag: 'Cashmere Atelier', style: 'Condensed Editorial', bgClass: 'bg-[#1c1618]', textClass: 'text-white', subClass: 'text-[#e2b4bd]', symbol: '✧', fontClass: 'font-serif font-bold tracking-[0.18em]' },
+  { id: 'arch', name: 'ARCH', category: 'minimalist', tag: 'Object Design', style: 'Extended Baseline', bgClass: 'bg-[#f1ede4]', textClass: 'text-[#1c1b18]', subClass: 'text-[#d97706]', symbol: '∏', fontClass: 'font-black tracking-[0.26em]' },
+  { id: 'ledger', name: 'LEDGER', category: 'fintech', tag: 'Audit Protocol', style: 'Block Heavy Sans', bgClass: 'bg-[#0f141c]', textClass: 'text-white', subClass: 'text-[#34d399]', symbol: '✓', fontClass: 'font-black tracking-[-0.03em]' },
+  { id: 'fable', name: 'fable.', category: 'lifestyle', tag: 'Heirloom Stories', style: 'Playful Rounded', bgClass: 'bg-[#fff8f0]', textClass: 'text-[#7f4f24]', subClass: 'text-[#b08968]', symbol: '★', fontClass: 'font-serif font-black tracking-tight' },
+  { id: 'voxel', name: 'VOXEL', category: 'tech', tag: 'Spatial 3D Engine', style: 'Isometric Display', bgClass: 'bg-[#130e20]', textClass: 'text-[#f3e8ff]', subClass: 'text-[#c084fc]', symbol: '❖', fontClass: 'font-mono font-black tracking-[0.1em]' },
+  { id: 'solene', name: 'Solène', category: 'luxury', tag: 'Fine Parfumerie', style: 'Parisienne Italic', bgClass: 'bg-[#171412]', textClass: 'text-white', subClass: 'text-[#eed5b7]', symbol: '✽', fontClass: 'font-serif font-light italic tracking-[0.16em]' },
+  { id: 'mono', name: 'MONO', category: 'minimalist', tag: 'Independent Press', style: 'Brutalist Monospace', bgClass: 'bg-[#000000]', textClass: 'text-white', subClass: 'text-white/60', symbol: '[]', fontClass: 'font-mono font-black tracking-[0.3em]' },
+  { id: 'pulse', name: 'PULSE', category: 'fintech', tag: 'High-Frequency Trading', style: 'Dynamic Italic', bgClass: 'bg-[#0a0f1d]', textClass: 'text-white', subClass: 'text-[#38bdf8]', symbol: '⚡', fontClass: 'font-black italic tracking-[-0.06em]' },
+];
+
 async function makeReviewPreview(imageUrl: string): Promise<string> {
   if (!imageUrl.startsWith('data:image/') || imageUrl.startsWith('data:image/svg+xml')) return imageUrl;
   return new Promise((resolve) => {
@@ -65,6 +105,8 @@ export default function Home() {
   const [account, setAccount] = useState<{ email: string; credits: number } | null>(null);
   const [maxIterations, setMaxIterations] = useState(3);
   const [autoReview, setAutoReview] = useState(false);
+  const [byokStatus, setByokStatus] = useState<{ currentPrice: number; tier: number; slotsRemaining: number; nextPrice: number } | null>(null);
+  const [galleryFilter, setGalleryFilter] = useState<'all' | 'tech' | 'luxury' | 'minimalist' | 'lifestyle' | 'fintech'>('all');
   const bestCandidate = useRef<{ logo: LogoResult; review: QualityScore } | null>(null);
 
   const applyQualityReview = (candidate: LogoResult, review: QualityScore) => {
@@ -91,6 +133,19 @@ export default function Home() {
       void fetch('/api/v1/studio-config')
         .then((response) => response.json() as Promise<{ data?: { maxIterations?: number; autoReview?: boolean } }>)
         .then((payload) => { setMaxIterations(payload?.data?.maxIterations || 3); setAutoReview(Boolean(payload?.data?.autoReview)); })
+        .catch(() => undefined);
+      void fetch('/api/v1/billing/byok-status')
+        .then(async (response) => response.ok ? response.json() as Promise<{ ok?: boolean; currentPrice?: number; tier?: number; slotsRemaining?: number; nextPrice?: number }> : null)
+        .then((payload) => {
+          if (payload?.ok && payload.currentPrice) {
+            setByokStatus({
+              currentPrice: payload.currentPrice,
+              tier: payload.tier || 1,
+              slotsRemaining: payload.slotsRemaining || 5,
+              nextPrice: payload.nextPrice || (payload.currentPrice + 10),
+            });
+          }
+        })
         .catch(() => undefined);
     }, 0);
     return () => window.clearTimeout(timer);
@@ -402,6 +457,7 @@ export default function Home() {
             <span className="ml-1 h-1.5 w-1.5 rounded-full bg-[#ff5c35] transition-transform group-hover:scale-150" />
           </a>
           <nav className="flex items-center gap-3 sm:gap-7" aria-label="Main navigation">
+            <a href="#showcase" className="hidden text-xs font-semibold uppercase tracking-[0.16em] transition-opacity hover:opacity-50 sm:block">Gallery</a>
             <a href="#process" className="hidden text-xs font-semibold uppercase tracking-[0.16em] transition-opacity hover:opacity-50 sm:block">Process</a>
             <a href="/developers" className="hidden text-xs font-semibold uppercase tracking-[0.16em] transition-opacity hover:opacity-50 md:block">Developers</a>
             <a href="#pricing" className="hidden text-xs font-semibold uppercase tracking-[0.16em] transition-opacity hover:opacity-50 lg:block">Pricing</a>
@@ -512,6 +568,112 @@ export default function Home() {
               </div>
             </section>
 
+            {/* Extensive 24-Logo Showcase Gallery */}
+            <section id="showcase" data-reveal className="reveal-section bg-[#10100e] px-5 py-20 text-white sm:px-8 lg:py-28">
+              <div className="mx-auto max-w-7xl">
+                <div className="flex flex-col gap-6 border-b border-white/10 pb-10 lg:flex-row lg:items-end lg:justify-between">
+                  <div>
+                    <div className="inline-flex items-center gap-2 rounded-full border border-[#c6ff4a]/30 bg-[#c6ff4a]/10 px-3.5 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-[#c6ff4a]">
+                      <span>✦</span> 24 Production Showcase Marks
+                    </div>
+                    <h2 className="mt-4 max-w-2xl text-4xl font-black leading-[0.92] tracking-[-0.065em] sm:text-6xl">
+                      Crafted by Wordmarks Studio.
+                    </h2>
+                    <p className="mt-4 max-w-xl text-sm leading-6 text-white/55">
+                      Explore real wordmarks generated across diverse design languages—from stark Swiss minimalism to haute couture serifs and bleeding-edge tech.
+                    </p>
+                  </div>
+
+                  {/* Filter Pills */}
+                  <div className="flex flex-wrap gap-2 text-xs font-bold">
+                    {[
+                      { key: 'all', label: 'All Logos (24)' },
+                      { key: 'tech', label: 'Tech & AI (5)' },
+                      { key: 'luxury', label: 'Luxury (5)' },
+                      { key: 'minimalist', label: 'Minimalist (5)' },
+                      { key: 'lifestyle', label: 'Lifestyle (5)' },
+                      { key: 'fintech', label: 'Fintech (4)' },
+                    ].map((tab) => (
+                      <button
+                        key={tab.key}
+                        type="button"
+                        onClick={() => setGalleryFilter(tab.key as any)}
+                        className={`rounded-full px-4 py-2 transition-all ${
+                          galleryFilter === tab.key
+                            ? 'bg-[#c6ff4a] text-black shadow-md shadow-[#c6ff4a]/20'
+                            : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Grid of Logos */}
+                <div className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {showcaseLogos
+                    .filter((item) => galleryFilter === 'all' || item.category === galleryFilter)
+                    .map((item) => (
+                      <div
+                        key={item.id}
+                        className={`group relative flex min-h-[220px] flex-col justify-between overflow-hidden rounded-2xl border border-white/10 ${item.bgClass} p-6 transition-all duration-300 hover:-translate-y-1 hover:border-white/30 hover:shadow-2xl`}
+                      >
+                        {/* Top tag & category badge */}
+                        <div className="flex items-center justify-between">
+                          <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-white/70">
+                            {item.category}
+                          </span>
+                          <span className="text-[10px] font-mono text-white/40">
+                            {item.style}
+                          </span>
+                        </div>
+
+                        {/* Visual Typographic Mark */}
+                        <div className="my-auto py-6 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <span className={`text-2xl sm:text-3xl ${item.fontClass} ${item.textClass}`}>
+                              {item.name}
+                            </span>
+                            {item.symbol ? (
+                              <span className={`text-sm ${item.subClass}`}>{item.symbol}</span>
+                            ) : null}
+                          </div>
+                          <p className={`mt-1.5 text-[9px] font-bold uppercase tracking-[0.25em] ${item.subClass}`}>
+                            {item.tag}
+                          </p>
+                        </div>
+
+                        {/* Bottom CTA / Inspiration action */}
+                        <div className="flex items-center justify-between border-t border-white/10 pt-3 text-[10px]">
+                          <span className="text-white/40">Vector SVG + PNG</span>
+                          <a
+                            href="#create"
+                            className="font-bold text-[#c6ff4a] opacity-80 transition-opacity group-hover:opacity-100 hover:underline"
+                          >
+                            Generate similar ↗
+                          </a>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+
+                {/* Studio CTA strip below gallery */}
+                <div className="mt-12 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/5 p-6">
+                  <div>
+                    <h3 className="text-base font-bold text-white">Need a logo like these for your company?</h3>
+                    <p className="mt-0.5 text-xs text-white/50">Enter your brand name in our studio and generate 100% custom typography in seconds.</p>
+                  </div>
+                  <a
+                    href="#create"
+                    className="rounded-full bg-[#c6ff4a] px-6 py-3 text-xs font-black uppercase tracking-wider text-black transition-transform hover:-translate-y-0.5"
+                  >
+                    Start in Studio
+                  </a>
+                </div>
+              </div>
+            </section>
+
             <section id="developers" data-reveal className="reveal-section overflow-hidden bg-[#c6ff4a] px-5 py-16 sm:px-8 lg:py-24">
               <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.82fr_1.18fr] lg:items-center">
                 <div>
@@ -598,6 +760,77 @@ export default function Home() {
                   <p className="max-w-xl text-base leading-7 text-black/55 lg:justify-self-end">
                     Pay with PayPal or card. Direct purchase only — no free trial. Unused credits never expire. Keep your account active from only $1 a month and receive fresh credits every month.
                   </p>
+                </div>
+
+                {/* Early Bird Lifetime Deal (BYOK) Hero Card */}
+                <div className="mt-8 overflow-hidden rounded-[2rem] border-2 border-[#ff5c35] bg-gradient-to-br from-[#1c1412] via-[#241916] to-[#12100e] p-7 text-white shadow-2xl sm:p-9">
+                  <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="max-w-2xl">
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        <span className="rounded-full bg-[#ff5c35] px-3.5 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-white">
+                          🔥 Early Bird Lifetime Deal (BYOK)
+                        </span>
+                        <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-amber-300">
+                          Tier {byokStatus?.tier || 1} · Only {byokStatus?.slotsRemaining ?? 5} slots left at this price!
+                        </span>
+                      </div>
+                      <h3 className="mt-4 text-3xl font-black tracking-[-0.05em] text-white sm:text-4xl">
+                        Bring Your Own Key. Generate Unlimited Logos.
+                      </h3>
+                      <p className="mt-2 text-sm leading-6 text-white/70">
+                        Pay once and never buy generation credits again. Plug in your own OpenAI / PesatRouter / Anthropic compatible key and generate without limits. Price increases by <strong className="text-white">+$10 every 5 sales</strong>!
+                      </p>
+
+                      <div className="mt-5 grid grid-cols-2 gap-3 text-xs text-white/80 sm:grid-cols-3">
+                        <div className="flex items-center gap-1.5"><span className="text-[#c6ff4a]">✓</span><span>Zero Credit Deductions</span></div>
+                        <div className="flex items-center gap-1.5"><span className="text-[#c6ff4a]">✓</span><span>100 Bonus Credits Included</span></div>
+                        <div className="flex items-center gap-1.5"><span className="text-[#c6ff4a]">✓</span><span>Full Vector SVG & PNG</span></div>
+                        <div className="flex items-center gap-1.5"><span className="text-[#c6ff4a]">✓</span><span>Commercial License</span></div>
+                        <div className="flex items-center gap-1.5"><span className="text-[#c6ff4a]">✓</span><span>MCP & REST API Support</span></div>
+                        <div className="flex items-center gap-1.5"><span className="text-[#c6ff4a]">✓</span><span>Lifetime Studio Updates</span></div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-start justify-between rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm lg:min-w-[270px] lg:items-end">
+                      <div>
+                        <span className="text-[10px] font-black uppercase tracking-[0.16em] text-white/50">Current Price</span>
+                        <div className="mt-1 flex items-baseline gap-1.5">
+                          <span className="text-5xl font-black tracking-[-0.06em] text-[#c6ff4a]">
+                            ${byokStatus?.currentPrice || 19}
+                          </span>
+                          <span className="text-xs text-white/50">one-time</span>
+                        </div>
+                        <p className="mt-1 text-[11px] font-medium text-amber-300">
+                          Next price: ${byokStatus?.nextPrice || 29}
+                        </p>
+                      </div>
+
+                      <div className="mt-6 w-full">
+                        <a
+                          href="/account?plan=byok_lifetime"
+                          className="block w-full rounded-full bg-[#ff5c35] hover:bg-[#e04c26] px-6 py-3.5 text-center text-xs font-black uppercase tracking-wider text-white shadow-lg shadow-[#ff5c35]/30 transition-all hover:-translate-y-0.5"
+                        >
+                          Claim Lifetime Deal (${byokStatus?.currentPrice || 19})
+                        </a>
+                        <p className="mt-2 text-center text-[10px] text-white/40">
+                          🔒 Direct PayPal or Card · Instant Access
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Flexible Refill Notification Strip */}
+                <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-black/10 bg-white/60 p-4 text-xs">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-base">💡</span>
+                    <span className="text-black/80 font-medium">
+                      <strong>No minimum order:</strong> Refill single credits from just <strong>$1.00</strong> ($1 = 1 logo export) directly in your account anytime.
+                    </span>
+                  </div>
+                  <a href="/account" className="rounded-full border border-black/15 bg-white px-3.5 py-1.5 text-xs font-bold text-black hover:bg-black/5">
+                    Refill Credits →
+                  </a>
                 </div>
 
                 <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">

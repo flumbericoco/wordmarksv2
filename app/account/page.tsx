@@ -11,6 +11,14 @@ interface Invoice { id: string; number: string; status: string; amountPaid: numb
 interface CreditEntry { id: string; amount: number; reason: string; created_at: string }
 interface BillingData { subscription: Subscription | null; invoices: Invoice[]; creditHistory: CreditEntry[]; reconciliation?: { fulfilled?: boolean; paymentStatus?: string } | null }
 interface Generation { id:string; brand_name:string; status:string; model:string; result_url?:string; error?:string; created_at:string }
+export interface BYOKStatusData {
+  salesCount: number;
+  currentPrice: number;
+  currentPriceStr: string;
+  tier: number;
+  slotsRemaining: number;
+  nextPrice: number;
+}
 
 class ApiRequestError extends Error {
   constructor(message: string, readonly status: number) { super(message); }
@@ -37,6 +45,8 @@ export default function AccountPage() {
   const [newToken, setNewToken] = useState('');
   const [billing, setBilling] = useState<BillingData>({ subscription: null, invoices: [], creditHistory: [] });
   const [generations, setGenerations] = useState<Generation[]>([]);
+  const [byokStatus, setByokStatus] = useState<BYOKStatusData | null>(null);
+  const [customCreditAmount, setCustomCreditAmount] = useState<number>(5);
   const [requestedPlan] = useState(() => typeof window === 'undefined' ? '' : new URLSearchParams(window.location.search).get('plan') || '');
   const [message, setMessage] = useState(() => {
     if (typeof window === 'undefined') return '';
@@ -85,6 +95,10 @@ export default function AccountPage() {
         const history = await api<{ generations: Generation[] }>('account/generations');
         setGenerations(history.generations);
       } catch { /* Keep account usable if history is temporarily unavailable. */ }
+      try {
+        const byokData = await api<BYOKStatusData & { ok: boolean }>('billing/byok-status');
+        if (byokData.ok) setByokStatus(byokData);
+      } catch { /* Keep account usable if byok status is temporarily unavailable. */ }
     } catch (reason) {
       if (reason instanceof ApiRequestError && reason.status === 401) setUser(null);
     }
@@ -212,12 +226,16 @@ export default function AccountPage() {
     return paypalCheckout(plan);
   }
 
-  async function paypalCheckout(product: string = 'topup') {
+  async function paypalCheckout(product: string = 'topup', customCredits?: number) {
     setBusy(true); setMessage('');
     try {
+      const payload: { product: string; customCredits?: number } = { product };
+      if (customCredits && customCredits >= 1) {
+        payload.customCredits = customCredits;
+      }
       const result = await api<{ url: string }>('billing/paypal-create-order', {
         method: 'POST',
-        body: JSON.stringify({ product }),
+        body: JSON.stringify(payload),
       });
       window.location.assign(result.url);
     } catch (error) {
@@ -373,32 +391,77 @@ export default function AccountPage() {
             <div>
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-black uppercase tracking-[0.2em] text-[#c6ff4a]">Available Balance</span>
-                <span className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white/70">Direct Purchase</span>
+                {user.plan === 'byok_lifetime' ? (
+                  <span className="rounded-full bg-[#c6ff4a] px-3 py-1 text-[10px] font-black uppercase tracking-wider text-black">Lifetime BYOK Active</span>
+                ) : (
+                  <span className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white/70">Direct Purchase</span>
+                )}
               </div>
               <div className="mt-6 flex items-baseline gap-3">
                 <span className="text-7xl font-black tracking-[-0.07em] text-white sm:text-8xl">{user.credits}</span>
                 <span className="text-sm font-bold uppercase tracking-wider text-white/40">credits</span>
               </div>
               <p className="mt-4 text-xs leading-5 text-white/60">
-                1 credit generates 1 logo export (SVG + PNG + WebP). Direct purchase only · No free trial. Unused credits never expire.
+                {user.plan === 'byok_lifetime'
+                  ? '⚡ Lifetime BYOK plan active: Unlimited logo generations without credit deduction! Plus bonus credits for cloud fallbacks.'
+                  : '1 credit generates 1 logo export (SVG + PNG + WebP). Direct purchase only · No free trial. Unused credits never expire.'}
               </p>
             </div>
 
             <div className="mt-8 border-t border-white/10 pt-6">
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/40">Instant Refill Pack</p>
-              <button
-                disabled={busy}
-                onClick={() => paypalCheckout('topup')}
-                className="mt-3 w-full rounded-2xl bg-[#c6ff4a] hover:bg-[#b5f532] px-6 py-4 text-left font-black text-black shadow-lg shadow-[#c6ff4a]/20 transition-all hover:-translate-y-0.5 disabled:opacity-50 flex items-center justify-between"
-              >
-                <div>
-                  <span className="block text-sm font-black uppercase tracking-wider">Top Up 25 Credits</span>
-                  <span className="block text-[11px] font-medium text-black/70">Card or PayPal · $1.00 per credit</span>
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/40">Instant Refill (No Minimum)</p>
+                <span className="text-[10px] font-bold text-[#c6ff4a]">$1 = 1 Credit</span>
+              </div>
+
+              {/* Quick Select Chips */}
+              <div className="mt-3 grid grid-cols-4 gap-2">
+                {[
+                  { credits: 1, label: '$1' },
+                  { credits: 5, label: '$5' },
+                  { credits: 10, label: '$10' },
+                  { credits: 25, label: '$25' },
+                ].map((chip) => (
+                  <button
+                    key={chip.credits}
+                    type="button"
+                    onClick={() => setCustomCreditAmount(chip.credits)}
+                    className={`rounded-xl py-2 text-center text-xs font-black transition-all ${
+                      customCreditAmount === chip.credits
+                        ? 'bg-[#c6ff4a] text-black ring-2 ring-[#c6ff4a]/50'
+                        : 'bg-white/10 text-white/80 hover:bg-white/20'
+                    }`}
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Custom Amount Stepper / Input */}
+              <div className="mt-3 flex items-center gap-2">
+                <div className="flex flex-1 items-center rounded-xl border border-white/15 bg-white/5 px-3 py-2">
+                  <span className="text-xs font-bold text-white/50">$</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={500}
+                    value={customCreditAmount}
+                    onChange={(e) => setCustomCreditAmount(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                    className="w-full bg-transparent px-2 text-sm font-black text-white outline-none"
+                  />
+                  <span className="text-[11px] font-bold text-white/40">credits</span>
                 </div>
-                <span className="rounded-full bg-black px-3 py-1.5 text-xs font-black text-white">$25</span>
-              </button>
+                <button
+                  disabled={busy || customCreditAmount < 1}
+                  onClick={() => paypalCheckout(customCreditAmount === 25 ? 'topup' : `credit_${customCreditAmount}`, customCreditAmount)}
+                  className="rounded-xl bg-[#c6ff4a] hover:bg-[#b5f532] px-5 py-2.5 text-xs font-black uppercase tracking-wider text-black transition-all hover:-translate-y-0.5 disabled:opacity-50"
+                >
+                  Pay ${customCreditAmount}
+                </button>
+              </div>
+
               <p className="mt-3 text-center text-[10px] text-white/45">
-                🔒 Powered by PayPal · Accepts Debit/Credit Card or PayPal account
+                🔒 Powered by PayPal · Accepts Debit/Credit Card or PayPal · $1 minimum
               </p>
             </div>
           </div>
@@ -485,6 +548,95 @@ export default function AccountPage() {
               {billing.subscription ? (
                 <span className="font-bold text-[#5b42d5]">Active membership in place</span>
               ) : null}
+            </div>
+          </div>
+        </section>
+
+        {/* Early Bird BYOK Lifetime Deal Banner */}
+        <section className="mb-8 overflow-hidden rounded-[2rem] border-2 border-[#ff5c35] bg-gradient-to-br from-[#1b1715] via-[#231a16] to-[#12100e] p-7 text-white shadow-2xl sm:p-9">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-2xl">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <span className="rounded-full bg-[#ff5c35] px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-white">
+                  🔥 Early Bird Lifetime Deal (BYOK)
+                </span>
+                <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-amber-300">
+                  Tier {byokStatus?.tier || 1} · {byokStatus?.slotsRemaining ?? 5} of 5 spots left
+                </span>
+                {user.plan === 'byok_lifetime' ? (
+                  <span className="rounded-full bg-emerald-500/20 border border-emerald-400 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-300">
+                    Active on your account
+                  </span>
+                ) : null}
+              </div>
+
+              <h2 className="mt-4 text-3xl font-black tracking-[-0.05em] sm:text-4xl text-white">
+                Bring Your Own Key. Generate Unlimited Logos Forever.
+              </h2>
+              <p className="mt-3 text-sm leading-6 text-white/70">
+                Pay once, use your own AI model keys (OpenAI / PesatRouter / Anthropic compatible), and never pay for wordmark generation credits again. Price increases by <strong className="text-white">+$10 every 5 sales</strong>!
+              </p>
+
+              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 text-xs text-white/80">
+                <div className="flex items-center gap-2">
+                  <span className="text-[#c6ff4a]">✓</span>
+                  <span><strong>0 Credits Deducted</strong> (Unlimited)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[#c6ff4a]">✓</span>
+                  <span><strong>100 Bonus Credits</strong> included</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[#c6ff4a]">✓</span>
+                  <span><strong>Vector SVG + PNG</strong> exports</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[#c6ff4a]">✓</span>
+                  <span><strong>Full Commercial</strong> Rights</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[#c6ff4a]">✓</span>
+                  <span><strong>MCP & REST API</strong> support</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[#c6ff4a]">✓</span>
+                  <span><strong>Lifetime</strong> updates</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-start lg:items-end justify-between rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm lg:min-w-[280px]">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-[0.16em] text-white/50">Current Price</span>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <span className="text-5xl font-black tracking-[-0.06em] text-[#c6ff4a]">
+                    ${byokStatus?.currentPrice || 19}
+                  </span>
+                  <span className="text-xs text-white/50">one-time</span>
+                </div>
+                <p className="mt-1 text-[11px] text-amber-300 font-medium">
+                  Next tier: ${byokStatus?.nextPrice || 29} after {byokStatus?.slotsRemaining ?? 5} more sales
+                </p>
+              </div>
+
+              <div className="mt-6 w-full">
+                {user.plan === 'byok_lifetime' ? (
+                  <div className="rounded-xl bg-emerald-500/20 border border-emerald-500/40 p-3 text-center text-xs font-bold text-emerald-300">
+                    ✓ You own this Lifetime Deal
+                  </div>
+                ) : (
+                  <button
+                    disabled={busy}
+                    onClick={() => paypalCheckout('byok_lifetime')}
+                    className="w-full rounded-full bg-[#ff5c35] hover:bg-[#e04c26] px-6 py-3.5 text-center text-xs font-black uppercase tracking-wider text-white shadow-lg shadow-[#ff5c35]/30 transition-all hover:-translate-y-0.5 disabled:opacity-50"
+                  >
+                    Get Lifetime Deal (${byokStatus?.currentPrice || 19})
+                  </button>
+                )}
+                <p className="mt-2 text-center text-[10px] text-white/40">
+                  Instant activation via PayPal / Card
+                </p>
+              </div>
             </div>
           </div>
         </section>
