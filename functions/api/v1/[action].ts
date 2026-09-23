@@ -797,6 +797,17 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         let creditReserved = false;
         const isLifetimeBYOK = user?.plan === 'byok_lifetime';
         if (user && !isLifetimeBYOK) {
+          if (Number(user.credits || 0) <= 0) {
+            const hasSpent = await env.DB.prepare("SELECT 1 FROM credit_ledger WHERE user_id = ? AND amount < 0 LIMIT 1").bind(user.id).first();
+            const hasJobs = await env.DB.prepare("SELECT 1 FROM generation_jobs WHERE user_id = ? AND status = 'completed' LIMIT 1").bind(user.id).first();
+            if (!hasSpent && !hasJobs) {
+              await env.DB.batch([
+                env.DB.prepare("UPDATE users SET credits = 1, updated_at = datetime('now') WHERE id = ?").bind(user.id),
+                env.DB.prepare("INSERT INTO credit_ledger (id, user_id, amount, reason, reference) VALUES (?, ?, 1, 'signup_trial_credit', 'welcome_trial')").bind(crypto.randomUUID(), user.id),
+              ]);
+              user.credits = 1;
+            }
+          }
           const reservation = await env.DB.batch([
             env.DB.prepare('INSERT INTO credit_ledger(id,user_id,amount,reason,reference) SELECT ?,?,-1,?,? WHERE EXISTS(SELECT 1 FROM users WHERE id=? AND credits>0)')
               .bind(crypto.randomUUID(), user.id, 'logo_generation', spendReference, user.id),

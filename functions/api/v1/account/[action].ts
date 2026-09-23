@@ -124,7 +124,8 @@ export const onRequest: PagesFunction<Env> = async ({ request, env, params }) =>
     const salt = randomToken(16);
     const passwordHash = await hashPassword(password, salt);
     await env.DB.batch([
-      env.DB.prepare('INSERT INTO users (id, email, password_hash, password_salt, credits) VALUES (?, ?, ?, ?, 0)').bind(id, email, passwordHash, salt),
+      env.DB.prepare('INSERT INTO users (id, email, password_hash, password_salt, credits) VALUES (?, ?, ?, ?, 1)').bind(id, email, passwordHash, salt),
+      env.DB.prepare("INSERT INTO credit_ledger (id, user_id, amount, reason, reference) VALUES (?, ?, 1, 'signup_trial_credit', 'welcome_trial')").bind(crypto.randomUUID(), id),
       env.DB.prepare("INSERT INTO settings(key,value,updated_at) VALUES(?,?,datetime('now'))").bind(pendingVerificationKey(id), email),
     ]);
     const emailSent = await issueVerificationEmail(env, new URL(request.url).origin, id, email).catch(() => false);
@@ -157,10 +158,25 @@ export const onRequest: PagesFunction<Env> = async ({ request, env, params }) =>
     }
     const pending = await env.DB.prepare('SELECT key FROM settings WHERE key=?').bind(pendingVerificationKey(String(user.id))).first();
     if (pending) return json({ error: 'Verify your email before signing in.', code: 'EMAIL_NOT_VERIFIED', verificationRequired: true, email }, 403);
+    
+    // Auto-grant 1 free trial credit if new user has 0 credits and never had any usage
+    let userCredits = Number(user.credits || 0);
+    if (userCredits <= 0) {
+      const hasSpent = await env.DB.prepare("SELECT 1 FROM credit_ledger WHERE user_id = ? AND amount < 0 LIMIT 1").bind(user.id).first();
+      const hasJobs = await env.DB.prepare("SELECT 1 FROM generation_jobs WHERE user_id = ? AND status = 'completed' LIMIT 1").bind(user.id).first();
+      if (!hasSpent && !hasJobs) {
+        await env.DB.batch([
+          env.DB.prepare("UPDATE users SET credits = 1, updated_at = datetime('now') WHERE id = ?").bind(user.id),
+          env.DB.prepare("INSERT INTO credit_ledger (id, user_id, amount, reason, reference) VALUES (?, ?, 1, 'signup_trial_credit', 'welcome_trial')").bind(crypto.randomUUID(), user.id),
+        ]);
+        userCredits = 1;
+      }
+    }
+
     const token = randomToken();
     await env.DB.prepare("INSERT INTO user_sessions (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, datetime('now', '+30 days'))")
       .bind(crypto.randomUUID(), user.id, await sha256(token)).run();
-    return json({ ok: true, user: { id: user.id, email, plan: user.plan, credits: user.credits } }, 200, { 'Set-Cookie': sessionCookie(token) });
+    return json({ ok: true, user: { id: user.id, email, plan: user.plan, credits: userCredits } }, 200, { 'Set-Cookie': sessionCookie(token) });
   }
 
   if (action === 'logout' && request.method === 'POST') {
@@ -173,7 +189,20 @@ export const onRequest: PagesFunction<Env> = async ({ request, env, params }) =>
   const user = await getUserSession(request, env.DB);
   if (!user) return json({ error: 'Authentication required' }, 401);
 
-  if (action === 'me' && request.method === 'GET') return json({ ok: true, user });
+  if (action === 'me' && request.method === 'GET') {
+    if (user.credits <= 0) {
+      const hasSpent = await env.DB.prepare("SELECT 1 FROM credit_ledger WHERE user_id = ? AND amount < 0 LIMIT 1").bind(user.id).first();
+      const hasJobs = await env.DB.prepare("SELECT 1 FROM generation_jobs WHERE user_id = ? AND status = 'completed' LIMIT 1").bind(user.id).first();
+      if (!hasSpent && !hasJobs) {
+        await env.DB.batch([
+          env.DB.prepare("UPDATE users SET credits = 1, updated_at = datetime('now') WHERE id = ?").bind(user.id),
+          env.DB.prepare("INSERT INTO credit_ledger (id, user_id, amount, reason, reference) VALUES (?, ?, 1, 'signup_trial_credit', 'welcome_trial')").bind(crypto.randomUUID(), user.id),
+        ]);
+        user.credits = 1;
+      }
+    }
+    return json({ ok: true, user });
+  }
 
   if (action === 'keys' && request.method === 'GET') {
     const keys = await env.DB.prepare(

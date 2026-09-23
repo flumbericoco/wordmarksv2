@@ -127,7 +127,7 @@ export default function AdminBillingPage() {
           <h1 className="mt-2 text-5xl font-black tracking-[-0.06em]">Billing & payments</h1>
         </div>
         <div className="rounded-2xl border border-black/10 bg-white/70 px-4 py-2 text-xs">
-          <span className="font-bold text-black">Policy:</span> <span className="font-medium text-black/60">Direct Purchase Only · 0 Free Trial Credits</span>
+          <span className="font-bold text-black">Policy:</span> <span className="font-medium text-black/60">1 Free Trial Credit on Registration · Refill from $1</span>
         </div>
       </div>
 

@@ -56,19 +56,14 @@ test('Admin studio provides PayPal client ID, secret key, environment and connec
   assert.match(testApi, /testPayPalCredentials/);
 });
 
-test('Zero free credits on registration and direct purchase policy enforcement', async () => {
+test('1 free trial credit on registration policy enforcement', async () => {
   const accountAction = await read('functions/api/v1/account/[action].ts');
   const accountPage = await read('app/account/page.tsx');
-  const homePage = await read('app/page.tsx');
 
-  // New accounts start with 0 credits
-  assert.match(accountAction, /INSERT INTO users \(id, email, password_hash, password_salt, credits\) VALUES \(\?, \?, \?, \?, 0\)/);
+  // New accounts start with 1 trial credit
+  assert.match(accountAction, /INSERT INTO users \(id, email, password_hash, password_salt, credits\) VALUES \(\?, \?, \?, \?, 1\)/);
 
   // Free beta replaced with direct purchase / standard account
   assert.doesNotMatch(accountPage, /Free beta/);
   assert.match(accountPage, /Direct purchase account/);
-  assert.match(accountPage, /No free trial/);
-
-  // Home page reflects direct purchase
-  assert.match(homePage, /Direct purchase · No free trial/);
 });

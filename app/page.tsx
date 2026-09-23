@@ -471,7 +471,7 @@ export default function Home() {
                   </a>
                   <span className="text-xs font-semibold uppercase tracking-[0.14em] text-black/65">No design skills needed</span>
                 </div>
-                <p className="mt-4 text-xs text-black/65">Direct purchase · No free trial. Start instantly with 25 credits for $25 via PayPal or card. One logo generation uses one credit.</p>
+                <p className="mt-4 text-xs text-black/65">Includes 1 free logo trial on signup. Top up anytime from $1 via PayPal or card. One logo generation uses one credit.</p>
               </div>
 
               <div className="relative mx-auto aspect-square w-full max-w-[380px] lg:justify-self-end">
@@ -792,13 +792,13 @@ export default function Home() {
               <div className="mx-auto max-w-7xl">
                 <div className="grid gap-6 border-b border-black/15 pb-10 lg:grid-cols-[1fr_0.8fr] lg:items-end">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#5b42d5]">Direct purchase · No free trial</p>
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#5b42d5]">1 Free Logo Trial · Refill from $1</p>
                     <h2 className="mt-4 max-w-3xl text-5xl font-black leading-[0.9] tracking-[-0.065em] sm:text-7xl">
                       Start with 25 logos for $25.
                     </h2>
                   </div>
                   <p className="max-w-xl text-base leading-7 text-black/55 lg:justify-self-end">
-                    Pay with PayPal or card. Direct purchase only — no free trial. Unused credits never expire. Keep your account active from only $1 a month and receive fresh credits every month.
+                    Includes 1 free logo trial when you register. Refill single credits from just $1 anytime. Unused credits never expire. Keep your account active from only $1 a month and receive fresh credits every month.
                   </p>
                 </div>
 
@@ -912,7 +912,7 @@ export default function Home() {
                 </div>
 
                 <div className="mt-7 grid gap-3 rounded-2xl border border-black/10 bg-white/40 p-5 text-sm text-black/60 sm:grid-cols-3">
-                  <p><strong className="text-black">No free trial. Direct purchase.</strong><br />Start instantly with 25 credits for $25.</p>
+                  <p><strong className="text-black">1 Free Logo Trial.</strong><br />Create an account to test 1 free logo generation instantly.</p>
                   <p><strong className="text-black">Use them anytime.</strong><br />Unused credits roll over forever.</p>
                   <p><strong className="text-black">No lock-in.</strong><br />Change plans or cancel whenever you want.</p>
                 </div>

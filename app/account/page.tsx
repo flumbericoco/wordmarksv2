@@ -302,7 +302,7 @@ export default function AccountPage() {
           <Link href="/" className="text-xl font-black tracking-[-0.06em]">wordmarks<span className="text-[#ff5c35]">.</span></Link>
           <p className="mt-10 text-xs font-black uppercase tracking-[0.18em] text-[#5b42d5]">Direct purchase account</p>
           <h1 className="mt-3 text-4xl font-black tracking-[-0.06em]">{mode === 'register' ? 'Create your account.' : 'Welcome back.'}</h1>
-          <p className="mt-2 text-xs text-black/50">Direct purchase · No free trial. Buy credits to start generating.</p>
+          <p className="mt-2 text-xs text-black/50">Includes 1 free logo trial on signup. Refill anytime from $1.</p>
           <form className="mt-8 space-y-4" onSubmit={submitAuth}>
             <label className="block text-xs font-bold uppercase tracking-wider">Email<input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} className="mt-2 w-full rounded-xl border border-black/15 bg-white px-4 py-3 text-base font-normal normal-case tracking-normal outline-none focus:border-[#5b42d5]" /></label>
             <label className="block text-xs font-bold uppercase tracking-wider">Password<input type="password" minLength={10} required value={password} onChange={(event) => setPassword(event.target.value)} className="mt-2 w-full rounded-xl border border-black/15 bg-white px-4 py-3 text-base font-normal normal-case tracking-normal outline-none focus:border-[#5b42d5]" /></label>
@@ -404,7 +404,7 @@ export default function AccountPage() {
               <p className="mt-4 text-xs leading-5 text-white/60">
                 {user.plan === 'byok_lifetime'
                   ? '⚡ Lifetime BYOK plan active: Unlimited logo generations without credit deduction! Plus bonus credits for cloud fallbacks.'
-                  : '1 credit generates 1 logo export (SVG + PNG + WebP). Direct purchase only · No free trial. Unused credits never expire.'}
+                  : '1 credit generates 1 logo export (SVG + PNG + WebP). Includes 1 free trial credit on signup. Refill from $1 anytime.'}
               </p>
             </div>
 
